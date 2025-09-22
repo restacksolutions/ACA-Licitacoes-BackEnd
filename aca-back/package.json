@@ -30,7 +30,7 @@
     "compression": "^1.8.1",
     "cross-fetch": "^4.1.0",
     "helmet": "^8.1.0",
-    "jose": "^6.1.0",
+    "jose": "^4.15.4",
     "multer": "^2.0.2",
     "nestjs-pino": "^4.4.1",
     "nestjs-zod": "^5.0.1",

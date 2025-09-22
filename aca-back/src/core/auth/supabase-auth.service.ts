@@ -59,6 +59,52 @@ export class SupabaseAuthService {
     }
   }
 
+  async register(email: string, password: string) {
+    // Modo de desenvolvimento - registro mock
+    if (this.isDevelopment) {
+      // Para desenvolvimento, simula o registro
+      const mockToken = this.generateMockToken(email);
+      return {
+        access_token: mockToken,
+        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 horas
+        email: email,
+        user_id: `mock-user-${email.replace('@', '-').replace('.', '-')}`,
+      };
+    }
+
+    try {
+      const { data, error } = await this.supabase.auth.signUp({
+        email,
+        password,
+      });
+
+      if (error) {
+        throw new UnauthorizedException('Erro no registro: ' + error.message);
+      }
+
+      if (!data.user) {
+        throw new UnauthorizedException('Falha no registro');
+      }
+
+      // Se o usuário precisa confirmar o email, retorna um token temporário
+      if (!data.session) {
+        throw new UnauthorizedException('Confirme seu email antes de fazer login');
+      }
+
+      return {
+        access_token: data.session.access_token,
+        expires_at: new Date(data.session.expires_at! * 1000).toISOString(),
+        email: data.user.email!,
+        user_id: data.user.id,
+      };
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      throw new UnauthorizedException('Erro interno no registro');
+    }
+  }
+
   async verifyToken(token: string) {
     // Modo de desenvolvimento - verificação mock
     if (this.isDevelopment) {

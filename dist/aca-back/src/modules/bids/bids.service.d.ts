@@ -1,0 +1,81 @@
+import { PrismaService } from '../../core/prisma/prisma.service';
+import { CreateBidDto } from './dto/bid.dto';
+export declare class BidsService {
+    private prisma;
+    constructor(prisma: PrismaService);
+    list(companyId: string): import(".prisma/client").Prisma.PrismaPromise<{
+        title: string;
+        id: string;
+        createdAt: Date;
+        companyId: string;
+        orgao: string | null;
+        modalidade: string | null;
+        editalUrl: string | null;
+        sessionAt: Date | null;
+        submissionDeadline: Date | null;
+        status: import(".prisma/client").$Enums.LicitacaoStatus;
+        saleValue: import("@prisma/client/runtime/library").Decimal | null;
+        notes: string | null;
+        updatedAt: Date;
+    }[]>;
+    create(companyId: string, dto: CreateBidDto): import(".prisma/client").Prisma.Prisma__LicitacaoClient<{
+        title: string;
+        id: string;
+        createdAt: Date;
+        companyId: string;
+        orgao: string | null;
+        modalidade: string | null;
+        editalUrl: string | null;
+        sessionAt: Date | null;
+        submissionDeadline: Date | null;
+        status: import(".prisma/client").$Enums.LicitacaoStatus;
+        saleValue: import("@prisma/client/runtime/library").Decimal | null;
+        notes: string | null;
+        updatedAt: Date;
+    }, never, import("@prisma/client/runtime/library").DefaultArgs, import(".prisma/client").Prisma.PrismaClientOptions>;
+    get(companyId: string, bidId: string): Promise<{
+        title: string;
+        id: string;
+        createdAt: Date;
+        companyId: string;
+        orgao: string | null;
+        modalidade: string | null;
+        editalUrl: string | null;
+        sessionAt: Date | null;
+        submissionDeadline: Date | null;
+        status: import(".prisma/client").$Enums.LicitacaoStatus;
+        saleValue: import("@prisma/client/runtime/library").Decimal | null;
+        notes: string | null;
+        updatedAt: Date;
+    }>;
+    update(companyId: string, bidId: string, dto: Partial<CreateBidDto>): import(".prisma/client").Prisma.Prisma__LicitacaoClient<{
+        title: string;
+        id: string;
+        createdAt: Date;
+        companyId: string;
+        orgao: string | null;
+        modalidade: string | null;
+        editalUrl: string | null;
+        sessionAt: Date | null;
+        submissionDeadline: Date | null;
+        status: import(".prisma/client").$Enums.LicitacaoStatus;
+        saleValue: import("@prisma/client/runtime/library").Decimal | null;
+        notes: string | null;
+        updatedAt: Date;
+    }, never, import("@prisma/client/runtime/library").DefaultArgs, import(".prisma/client").Prisma.PrismaClientOptions>;
+    remove(bidId: string): import(".prisma/client").Prisma.Prisma__LicitacaoClient<{
+        title: string;
+        id: string;
+        createdAt: Date;
+        companyId: string;
+        orgao: string | null;
+        modalidade: string | null;
+        editalUrl: string | null;
+        sessionAt: Date | null;
+        submissionDeadline: Date | null;
+        status: import(".prisma/client").$Enums.LicitacaoStatus;
+        saleValue: import("@prisma/client/runtime/library").Decimal | null;
+        notes: string | null;
+        updatedAt: Date;
+    }, never, import("@prisma/client/runtime/library").DefaultArgs, import(".prisma/client").Prisma.PrismaClientOptions>;
+}
