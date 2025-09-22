@@ -27,7 +27,11 @@ export class CompaniesService {
       throw new NotFoundException('Company not found');
     }
 
-    return company;
+    return {
+      ...company,
+      createdAt: company.createdAt.toISOString(),
+      updatedAt: company.updatedAt.toISOString(),
+    };
   }
 
   async update(id: string, updateDto: UpdateCompanyDto, userId: string) {
@@ -45,7 +49,7 @@ export class CompaniesService {
       throw new ForbiddenException('Insufficient permissions');
     }
 
-    return this.prisma.company.update({
+    const updatedCompany = await this.prisma.company.update({
       where: { id },
       data: updateDto,
       select: {
@@ -61,5 +65,11 @@ export class CompaniesService {
         updatedAt: true,
       },
     });
+
+    return {
+      ...updatedCompany,
+      createdAt: updatedCompany.createdAt.toISOString(),
+      updatedAt: updatedCompany.updatedAt.toISOString(),
+    };
   }
 }

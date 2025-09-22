@@ -1,1 +1,0 @@
-{"version":3,"file":"current-company.decorator.js","sourceRoot":"","sources":["../../../../../aca-back/src/core/tenancy/current-company.decorator.ts"],"names":[],"mappings":";;;AAAA,2CAAwE;AAC3D,QAAA,cAAc,GAAG,IAAA,6BAAoB,EAAC,CAAC,EAAE,EAAE,GAAqB,EAAE,EAAE;IAC/E,MAAM,GAAG,GAAG,GAAG,CAAC,YAAY,EAAE,CAAC,UAAU,EAAE,CAAC;IAC5C,OAAO,GAAG,CAAC,SAAmB,CAAC;AACjC,CAAC,CAAC,CAAC"}
