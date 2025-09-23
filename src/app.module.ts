@@ -5,11 +5,13 @@ import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { CompaniesModule } from './modules/companies/companies.module';
 import { MembersModule } from './modules/members/members.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
     ConfigModule,
     PrismaModule,
+    HealthModule,
     AuthModule,
     UsersModule,
     CompaniesModule,
