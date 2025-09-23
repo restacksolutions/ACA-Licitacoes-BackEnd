@@ -42,6 +42,18 @@ export class CompaniesController {
   @Roles('owner','admin')
   @Patch(':companyId')
   async update(@Param('companyId') companyId: string, @Body() dto: UpdateCompanyDto) {
-    return this.svc.update(companyId, dto);
+    console.log('[CompaniesController.update] ===== ATUALIZANDO EMPRESA =====');
+    console.log('[CompaniesController.update] CompanyId recebido:', companyId);
+    console.log('[CompaniesController.update] Tipo do companyId:', typeof companyId);
+    console.log('[CompaniesController.update] DTO recebido:', dto);
+    console.log('[CompaniesController.update] Chaves do DTO:', Object.keys(dto));
+    console.log('[CompaniesController.update] Chamando svc.update...');
+    
+    const result = await this.svc.update(companyId, dto);
+    
+    console.log('[CompaniesController.update] Resultado do svc.update:', result);
+    console.log('[CompaniesController.update] ===== ATUALIZAÇÃO CONCLUÍDA =====');
+    
+    return result;
   }
 }
