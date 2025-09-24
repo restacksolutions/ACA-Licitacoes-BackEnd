@@ -13,7 +13,7 @@ export class CompanyGuard implements CanActivate {
     console.log('[CompanyGuard] Body:', req.body);
     console.log('[CompanyGuard] Params:', req.params);
     
-    const companyId = (req.headers['x-company-id'] as string) || req.query.companyId || req.body?.companyId || req.params?.companyId;
+    const companyId = req.params?.companyId || (req.headers['x-company-id'] as string) || req.query.companyId || req.body?.companyId;
     console.log('[CompanyGuard] CompanyId extraído:', companyId);
     
     if (!companyId) {

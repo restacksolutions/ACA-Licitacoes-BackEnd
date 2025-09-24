@@ -72,13 +72,23 @@ model CompanyDocument {
   issuer      String?
   issueDate   DateTime? @map("issue_date") @db.Date
   expiresAt   DateTime? @map("expires_at") @db.Date
+  // LEGADO
   filePath    String?   @map("file_path")
+  
+  // NOVO (BYTEA + metadados)
+  fileBytes   Bytes?    @db.ByteA
+  mimeType    String?   @default("application/pdf") @map("mime_type")
+  fileSize    BigInt?   @map("file_size")
+  sha256Hex   String?   @map("sha256_hex")
+  
   notes       String?
   version     Int       @default(1)
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
   company     Company   @relation(fields: [companyId], references: [id])
 
+  @@unique([companyId, docType, version], name: "company_documents_unique_per_version")
+  @@index([companyId, docType], name: "company_documents_lookup")
   @@map("company_documents")
 }
 
@@ -112,15 +122,25 @@ model LicitacaoDocument {
   signed                  Boolean   @default(false)
   issueDate               DateTime? @map("issue_date") @db.Date
   expiresAt               DateTime? @map("expires_at") @db.Date
+  // LEGADO
   filePath                String?   @map("file_path")
-  generatedFromTemplate   Boolean   @default(false) @map("generated_from_template")
   templatePath            String?   @map("template_path")
+  
+  // NOVO (BYTEA + metadados)
+  fileBytes               Bytes?    @db.ByteA
+  mimeType                String?   @default("application/pdf") @map("mime_type")
+  fileSize                BigInt?   @map("file_size")
+  sha256Hex               String?   @map("sha256_hex")
+  
+  generatedFromTemplate   Boolean   @default(false) @map("generated_from_template")
   version                 Int       @default(1)
   notes                   String?
   createdAt               DateTime  @default(now()) @map("created_at")
   updatedAt               DateTime  @updatedAt @map("updated_at")
   licitacao               Licitacao @relation(fields: [licitacaoId], references: [id])
 
+  @@unique([licitacaoId, docType, version], name: "licitacao_documents_unique_per_version")
+  @@index([licitacaoId, docType], name: "licitacao_documents_lookup")
   @@map("licitacao_documents")
 }
 

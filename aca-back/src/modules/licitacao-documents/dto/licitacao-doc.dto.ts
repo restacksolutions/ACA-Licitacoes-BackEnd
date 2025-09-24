@@ -1,21 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDateString, IsOptional, IsString, IsNumber, Min, Max } from 'class-validator';
+import { IsDateString, IsOptional, IsString, IsNumber, Min, Max, IsBoolean } from 'class-validator';
 import { Transform } from 'class-transformer';
 
-export class CreateCompanyDocDto {
-  @ApiProperty({ example: 'CNPJ' })
+export class CreateLicitacaoDocDto {
+  @ApiProperty({ example: 'PROPOSTA_TECNICA' })
   @IsString()
   docType!: string;
-
-  @ApiPropertyOptional({ example: '12.345.678/0001-90' })
-  @IsString()
-  @IsOptional()
-  docNumber?: string;
-
-  @ApiPropertyOptional({ example: 'Receita Federal' })
-  @IsString()
-  @IsOptional()
-  issuer?: string;
 
   @ApiPropertyOptional({ example: '2020-01-15' })
   @IsDateString()
@@ -31,24 +21,26 @@ export class CreateCompanyDocDto {
   @IsString()
   @IsOptional()
   notes?: string;
+
+  @ApiProperty({ example: true })
+  @IsBoolean()
+  required!: boolean;
+
+  @ApiProperty({ example: false })
+  @IsBoolean()
+  submitted!: boolean;
+
+  @ApiProperty({ example: false })
+  @IsBoolean()
+  signed!: boolean;
 }
 
-export class UpdateCompanyDocDto {
-  @ApiPropertyOptional({ example: 'CNPJ' })
+export class UpdateLicitacaoDocDto {
+  @ApiPropertyOptional({ example: 'PROPOSTA_TECNICA' })
   @IsString()
   @IsOptional()
   docType?: string;
 
-  @ApiPropertyOptional({ example: '12.345.678/0001-90' })
-  @IsString()
-  @IsOptional()
-  docNumber?: string;
-
-  @ApiPropertyOptional({ example: 'Receita Federal' })
-  @IsString()
-  @IsOptional()
-  issuer?: string;
-
   @ApiPropertyOptional({ example: '2020-01-15' })
   @IsDateString()
   @IsOptional()
@@ -63,20 +55,29 @@ export class UpdateCompanyDocDto {
   @IsString()
   @IsOptional()
   notes?: string;
+
+  @ApiPropertyOptional({ example: true })
+  @IsBoolean()
+  @IsOptional()
+  required?: boolean;
+
+  @ApiPropertyOptional({ example: false })
+  @IsBoolean()
+  @IsOptional()
+  submitted?: boolean;
+
+  @ApiPropertyOptional({ example: false })
+  @IsBoolean()
+  @IsOptional()
+  signed?: boolean;
 }
 
-export class CompanyDocResponseDto {
+export class LicitacaoDocResponseDto {
   @ApiProperty({ example: '123e4567-e89b-12d3-a456-426614174000' })
   id!: string;
 
-  @ApiProperty({ example: 'CNPJ' })
+  @ApiProperty({ example: 'PROPOSTA_TECNICA' })
   docType!: string;
-
-  @ApiPropertyOptional({ example: '12.345.678/0001-90' })
-  docNumber?: string;
-
-  @ApiPropertyOptional({ example: 'Receita Federal' })
-  issuer?: string;
 
   @ApiPropertyOptional({ example: '2020-01-15' })
   issueDate?: string;
@@ -99,6 +100,18 @@ export class CompanyDocResponseDto {
   @ApiPropertyOptional({ example: 'Documento em bom estado' })
   notes?: string;
 
+  @ApiProperty({ example: true })
+  required!: boolean;
+
+  @ApiProperty({ example: false })
+  submitted!: boolean;
+
+  @ApiProperty({ example: false })
+  signed!: boolean;
+
+  @ApiProperty({ example: false })
+  generatedFromTemplate!: boolean;
+
   @ApiProperty({ example: 1 })
   version!: number;
 
@@ -109,20 +122,10 @@ export class CompanyDocResponseDto {
   updatedAt!: string;
 }
 
-export class UploadDocumentDto {
-  @ApiProperty({ example: 'CNPJ' })
+export class UploadLicitacaoDocumentDto {
+  @ApiProperty({ example: 'PROPOSTA_TECNICA' })
   @IsString()
   docType!: string;
-
-  @ApiPropertyOptional({ example: '12.345.678/0001-90' })
-  @IsString()
-  @IsOptional()
-  docNumber?: string;
-
-  @ApiPropertyOptional({ example: 'Receita Federal' })
-  @IsString()
-  @IsOptional()
-  issuer?: string;
 
   @ApiPropertyOptional({ example: '2020-01-15' })
   @IsDateString()
@@ -138,10 +141,22 @@ export class UploadDocumentDto {
   @IsString()
   @IsOptional()
   notes?: string;
+
+  @ApiProperty({ example: true })
+  @IsBoolean()
+  required!: boolean;
+
+  @ApiProperty({ example: false })
+  @IsBoolean()
+  submitted!: boolean;
+
+  @ApiProperty({ example: false })
+  @IsBoolean()
+  signed!: boolean;
 }
 
-export class DocumentListQueryDto {
-  @ApiPropertyOptional({ example: 'CNPJ' })
+export class LicitacaoDocumentListQueryDto {
+  @ApiPropertyOptional({ example: 'PROPOSTA_TECNICA' })
   @IsString()
   @IsOptional()
   docType?: string;

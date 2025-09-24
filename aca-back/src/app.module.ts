@@ -15,6 +15,7 @@ import { UsersModule } from './modules/users/users.module';
 import { CompaniesModule } from './modules/companies/companies.module';
 import { MembersModule } from './modules/members/members.module';
 import { DocumentsModule } from './modules/documents/documents.module';
+import { LicitacaoDocumentsModule } from './modules/licitacao-documents/licitacao-documents.module';
 import { BidsModule } from './modules/bids/bids.module';
 import { BidDocsModule } from './modules/bid-docs/bid-docs.module';
 import { WorkflowModule } from './modules/workflow/workflow.module';
@@ -32,6 +33,7 @@ import { AuditModule } from './modules/audit/audit.module';
     CompaniesModule,
     MembersModule,
     DocumentsModule,
+    LicitacaoDocumentsModule,
     BidsModule,
     BidDocsModule,
     WorkflowModule,
