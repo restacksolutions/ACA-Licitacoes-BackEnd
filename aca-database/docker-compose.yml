@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: aca-licitacoes-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: aca_licitacoes
+      POSTGRES_USER: aca_user
+      POSTGRES_PASSWORD: aca_password
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=pt_BR.UTF-8 --lc-ctype=pt_BR.UTF-8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    networks:
+      - aca-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aca_user -d aca_licitacoes"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  aca-network:
+    driver: bridge

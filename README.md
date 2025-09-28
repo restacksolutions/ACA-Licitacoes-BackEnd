@@ -1,221 +1,153 @@
-# 🔧 ACA Licitações Backend API
+# 🔧 ACA Licitações Backend
 
-Sistema de licitações multi-tenant com autenticação JWT local, desenvolvido em **NestJS + Prisma + PostgreSQL**.
+Backend API do sistema de licitações desenvolvido em **NestJS + Prisma + PostgreSQL**.
 
 ## 🚀 Quick Start
 
-### 1. Subir a infraestrutura
+### Com Docker (Recomendado)
 
 ```bash
-# Subir PostgreSQL e Adminer
-docker compose up -d
+# 1. Iniciar banco de dados
+cd aca-database
+docker-compose up -d
 
-# Verificar se os containers estão rodando
-docker compose ps
+# 2. Iniciar backend
+cd ../aca-back
+docker-compose up -d
+
+# 3. Verificar logs
+docker-compose logs -f
 ```
 
-### 2. Instalar dependências
+### Desenvolvimento Local
 
 ```bash
+# 1. Instalar dependências
+cd aca-back
 npm install
-```
 
-### 3. Configurar banco de dados
+# 2. Configurar banco (PostgreSQL rodando)
+# Ajustar DATABASE_URL no .env
 
-```bash
-# Gerar cliente Prisma
-npx prisma generate
+# 3. Executar migrações
+npx prisma migrate dev
 
-# Executar migrações
-npx prisma migrate dev -n auth_register
-
-# (Opcional) Abrir Prisma Studio
-npx prisma studio
-```
-
-### 4. Executar aplicação
-
-```bash
-# Modo desenvolvimento
+# 4. Iniciar em modo desenvolvimento
 npm run start:dev
-
-# Modo produção
-npm run build
-npm run start:prod
 ```
 
-## 📚 Documentação
-
-- **API Docs**: http://localhost:3000/docs
-- **Adminer**: http://localhost:8080 (PostgreSQL admin)
-
-## 🏗️ Arquitetura
-
-### Estrutura do Projeto
+## 📁 Estrutura
 
 ```
-src/
-├── core/                    # Módulos core
-│   ├── config/             # Configuração e validação de env
-│   ├── prisma/             # Cliente Prisma singleton
-│   ├── security/           # JWT, guards, decorators
-│   └── tenancy/            # Multi-tenancy (CompanyGuard)
-├── adapters/               # Adapters externos
-│   └── hashing/            # Argon2 para hash de senhas
-└── modules/                # Módulos de domínio
-    ├── auth/               # Autenticação (register, login, refresh)
-    ├── users/              # Gestão de usuários
-    ├── companies/          # Gestão de empresas
-    └── members/            # Gestão de membros
+aca-back/
+├── src/
+│   ├── core/                    # Módulos core
+│   │   ├── config/             # Configuração e validação
+│   │   ├── prisma/             # Cliente Prisma
+│   │   ├── security/           # JWT, guards, decorators
+│   │   └── tenancy/            # Multi-tenancy
+│   ├── adapters/               # Adapters externos
+│   └── modules/                # Módulos de domínio
+│       ├── auth/               # Autenticação
+│       ├── users/              # Usuários
+│       ├── companies/          # Empresas
+│       ├── members/            # Membros
+│       ├── documents/          # Documentos
+│       ├── bids/               # Propostas
+│       └── workflow/           # Workflow
+├── prisma/                     # Schema e migrações
+├── Dockerfile                  # Container do backend
+└── docker-compose.yml         # Backend + banco
 ```
-
-### Fluxo de Autenticação
-
-1. **Register**: Cria usuário + empresa + membership (owner)
-2. **Login**: Valida credenciais e retorna JWT tokens
-3. **Refresh**: Renova tokens usando refresh token
-4. **Guards**: Protegem rotas com JWT + Company + Roles
-
-### Multi-tenancy
-
-- **CompanyGuard**: Valida se usuário é membro da empresa
-- **RolesGuard**: Controla permissões por role (owner/admin/member)
-- **Rotas**: Padrão `/companies/:companyId/...`
 
 ## 🔐 Autenticação
 
 ### Endpoints
 
-| Método | Endpoint | Descrição | Auth |
-|--------|----------|-----------|------|
-| POST | `/auth/register` | Cadastrar usuário + empresa | ❌ |
-| POST | `/auth/login` | Login com email/senha | ❌ |
-| POST | `/auth/refresh` | Renovar tokens | ❌ |
-| GET | `/auth/me` | Dados do usuário logado | ✅ |
+| Método | Endpoint | Descrição |
+|--------|----------|-----------|
+| POST | `/v1/auth/register` | Cadastrar usuário + empresa |
+| POST | `/v1/auth/login` | Login |
+| POST | `/v1/auth/refresh` | Renovar tokens |
+| GET | `/v1/auth/me` | Dados do usuário |
 
-### Exemplo de Register
-
-```json
-POST /v1/auth/register
-{
-  "fullName": "João Silva",
-  "email": "joao@example.com",
-  "password": "Senha123",
-  "company": {
-    "name": "Empresa do João",
-    "cnpj": "00.000.000/0001-00",
-    "phone": "11 99999-9999",
-    "address": "Rua das Flores, 123"
-  }
-}
-```
-
-**Resposta (201):**
-```json
-{
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "access_expires_at": "2025-09-23T21:28:56.693Z",
-  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "refresh_expires_at": "2025-09-30T21:28:56.693Z",
-  "user": {
-    "id": "uuid",
-    "fullName": "João Silva",
-    "email": "joao@example.com",
-    "createdAt": "2025-09-22T20:30:00.000Z"
-  },
-  "company": {
-    "id": "uuid",
-    "name": "Empresa do João",
-    "cnpj": "00.000.000/0001-00",
-    "active": true,
-    "createdAt": "2025-09-22T20:30:00.000Z"
-  },
-  "membership": {
-    "id": "uuid",
-    "role": "owner"
-  }
-}
-```
-
-### Exemplo de Login
-
-```json
-POST /v1/auth/login
-{
-  "email": "joao@example.com",
-  "password": "Senha123"
-}
-```
-
-**Resposta (200):** Mesmo formato do register
-
-### Exemplo de Refresh
-
-```json
-POST /v1/auth/refresh
-{
-  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-```
-
-### Exemplo de Me
+### Exemplo de Uso
 
 ```bash
-GET /v1/auth/me
-Authorization: Bearer <access_token>
+# Register
+curl -X POST http://localhost:3000/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fullName": "João Silva",
+    "email": "joao@example.com",
+    "password": "Senha123",
+    "company": {
+      "name": "Empresa do João",
+      "cnpj": "00.000.000/0001-00"
+    }
+  }'
+
+# Login
+curl -X POST http://localhost:3000/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "joao@example.com",
+    "password": "Senha123"
+  }'
 ```
 
-**Resposta (200):**
-```json
-{
-  "id": "uuid",
-  "fullName": "João Silva",
-  "email": "joao@example.com",
-  "createdAt": "2025-09-22T20:30:00.000Z"
+## 🗄️ Banco de Dados
+
+### Schema Principal
+
+```prisma
+model AppUser {
+  id           String   @id @default(uuid())
+  fullName     String?
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  createdCompanies Company[] @relation("CompanyCreatedBy")
+  memberships      CompanyMember[]
+}
+
+model Company {
+  id             String   @id @default(uuid())
+  name           String
+  cnpj           String?  @unique
+  phone          String?
+  address        String?
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  createdById String   @map("created_by")
+  createdBy   AppUser  @relation("CompanyCreatedBy", fields: [createdById], references: [id])
+  members     CompanyMember[]
+  documents   CompanyDocument[]
+  licitacoes Licitacao[]
 }
 ```
 
-## 🏢 Gestão de Empresas
+### Comandos Prisma
 
-### Endpoints
+```bash
+# Gerar cliente
+npx prisma generate
 
-| Método | Endpoint | Descrição | Auth | Roles |
-|--------|----------|-----------|------|-------|
-| GET | `/companies/:id` | Detalhes da empresa | ✅ | - |
-| PATCH | `/companies/:id` | Atualizar empresa | ✅ | owner, admin |
+# Migração de desenvolvimento
+npx prisma migrate dev
 
-### Exemplo de Atualização
+# Deploy em produção
+npx prisma migrate deploy
 
-```json
-PATCH /v1/companies/{companyId}
-Authorization: Bearer <token>
-{
-  "name": "Nova Empresa",
-  "phone": "(11) 88888-8888",
-  "active": true
-}
-```
+# Prisma Studio
+npx prisma studio
 
-## 👥 Gestão de Membros
-
-### Endpoints
-
-| Método | Endpoint | Descrição | Auth | Roles |
-|--------|----------|-----------|------|-------|
-| GET | `/companies/:id/members` | Listar membros | ✅ | - |
-| POST | `/companies/:id/members` | Convidar membro | ✅ | owner, admin |
-| PATCH | `/companies/:id/members/:id` | Alterar role | ✅ | owner, admin |
-| DELETE | `/companies/:id/members/:id` | Remover membro | ✅ | owner, admin |
-
-### Exemplo de Convite
-
-```json
-POST /v1/companies/{companyId}/members
-Authorization: Bearer <token>
-{
-  "email": "newuser@example.com",
-  "role": "member"
-}
+# Reset do banco
+npx prisma migrate reset
 ```
 
 ## 🔧 Configuração
@@ -228,11 +160,10 @@ NODE_ENV=development
 PORT=3000
 
 # Database
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/aca?schema=public
+DATABASE_URL=postgresql://aca_user:aca_password@postgres:5432/aca_licitacoes?schema=public
 
-# JWT Secrets
-JWT_ACCESS_SECRET=dev_access_secret_change_me
-JWT_REFRESH_SECRET=dev_refresh_secret_change_me
+# JWT
+JWT_SECRET=your-super-secret-jwt-key-here
 JWT_ACCESS_EXPIRES=15m
 JWT_REFRESH_EXPIRES=7d
 
@@ -253,60 +184,54 @@ npm run build
 # Produção
 npm run start:prod
 
-# Prisma
-npm run prisma:generate    # Gerar cliente
-npm run prisma:migrate     # Executar migrações
-npm run prisma:deploy      # Deploy migrações
-npm run prisma:studio      # Interface visual
-npm run prisma:reset       # Reset banco
+# Testes
+npm run test
+npm run test:e2e
+
+# Linting
+npm run lint
+npm run format
 ```
 
-## 🗄️ Banco de Dados
+## 🐳 Docker
 
-### Modelos Principais
+### Build e Run
 
-- **AppUser**: Usuários do sistema
-- **Company**: Empresas (multi-tenant)
-- **CompanyMember**: Relacionamento usuário-empresa
-- **CompanyDocument**: Documentos da empresa
-- **Licitacao**: Licitações
-- **LicitacaoDocument**: Documentos de licitação
-- **LicitacaoEvent**: Eventos/histórico
+```bash
+# Build da imagem
+docker build -t aca-backend .
 
-### Enums
+# Executar container
+docker run -p 3000:3000 aca-backend
 
-- **RoleCompany**: `owner`, `admin`, `member`
-- **LicitacaoStatus**: `draft`, `open`, `closed`, `cancelled`, `awarded`
-- **CompanyDocType**: `cnpj`, `certidao`, `procuracao`, `outro`
-- **LicitacaoDocType**: `proposta`, `habilitacao`, `contrato`, `outro`
+# Com docker-compose
+docker-compose up -d
+```
 
-### Constraints Importantes
+### Health Check
 
-```sql
--- Um usuário só pode criar/possuir uma empresa
--- Para desativar esta constraint e permitir múltiplas empresas por usuário:
--- 1. Comente a linha @@unique([createdById]) em schema.prisma
--- 2. Execute: npx prisma migrate dev
-@@unique([createdById])
+```bash
+# Verificar saúde da API
+curl http://localhost:3000/health
 
--- Um usuário só pode ser membro de uma empresa (opcional)
--- Para ativar esta constraint (1 usuário = 1 empresa):
--- 1. Descomente a linha @@unique([userId]) em schema.prisma
--- 2. Execute: npx prisma migrate dev
--- @@unique([userId])
+# Logs do container
+docker-compose logs -f aca-backend
 ```
 
 ## 🛡️ Segurança
 
 ### Validações
 
-- **Senhas**: Mínimo 8 caracteres, pelo menos 1 letra e 1 número, hash com Argon2
+- **Senhas**: Mínimo 8 caracteres, hash com Argon2
 - **Email**: Formato válido, único no sistema
-- **CNPJ**: Formato 00.000.000/0001-00 ou 14 dígitos
-- **JWT**: Access token (15m) + Refresh token (7d) com algoritmo HS256
-- **Guards**: JWT + Company + Roles
-- **CORS**: Configurado para frontend
-- **Helmet**: Headers de segurança
+- **CNPJ**: Formato 00.000.000/0001-00
+- **JWT**: Access token (15m) + Refresh token (7d)
+
+### Guards
+
+- **JwtAuthGuard**: Valida JWT token
+- **CompanyGuard**: Valida membership na empresa
+- **RolesGuard**: Controla permissões por role
 
 ### Permissões
 
@@ -316,80 +241,49 @@ npm run prisma:reset       # Reset banco
 | admin | ❌ | ✅ | ✅ |
 | member | ❌ | ❌ | ❌ |
 
+## 📚 API Documentation
+
+- **Swagger UI**: http://localhost:3000/docs
+- **Health Check**: http://localhost:3000/health
+
 ## 🧪 Testes
 
-### Teste Manual
+```bash
+# Testes unitários
+npm run test
 
-1. **Register**:
-   ```bash
-   curl -X POST http://localhost:3000/v1/auth/register \
-     -H "Content-Type: application/json" \
-     -d '{"fullName":"João Silva","email":"joao@example.com","password":"Senha123","company":{"name":"Empresa do João","cnpj":"00.000.000/0001-00"}}'
-   ```
+# Testes e2e
+npm run test:e2e
 
-2. **Login**:
-   ```bash
-   curl -X POST http://localhost:3000/v1/auth/login \
-     -H "Content-Type: application/json" \
-     -d '{"email":"joao@example.com","password":"Senha123"}'
-   ```
-
-3. **Refresh**:
-   ```bash
-   curl -X POST http://localhost:3000/v1/auth/refresh \
-     -H "Content-Type: application/json" \
-     -d '{"refresh_token":"<refresh_token>"}'
-   ```
-
-4. **Auth Me**:
-   ```bash
-   curl -X GET http://localhost:3000/v1/auth/me \
-     -H "Authorization: Bearer <access_token>"
-   ```
+# Coverage
+npm run test:cov
+```
 
 ## 🚀 Deploy
 
 ### Produção
 
-1. **Configurar variáveis de ambiente**
-2. **Executar migrações**: `npx prisma migrate deploy`
-3. **Build**: `npm run build`
-4. **Start**: `npm run start:prod`
+```bash
+# 1. Build
+npm run build
 
-### Docker (Opcional)
+# 2. Executar migrações
+npx prisma migrate deploy
 
-```dockerfile
-FROM node:20-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-COPY . .
-RUN npm run build
-EXPOSE 3000
-CMD ["npm", "run", "start:prod"]
+# 3. Iniciar
+npm run start:prod
 ```
 
-## 📝 Próximos Passos
+### Docker
 
-- [ ] Implementar módulos de documentos
-- [ ] Implementar módulos de licitações
-- [ ] Implementar upload de arquivos
-- [ ] Implementar notificações
-- [ ] Implementar auditoria
-- [ ] Implementar testes automatizados
+```bash
+# Build para produção
+docker build -t aca-backend:prod .
 
-## 🤝 Contribuição
-
-1. Fork o projeto
-2. Crie uma branch (`git checkout -b feature/nova-funcionalidade`)
-3. Commit suas mudanças (`git commit -m 'Adiciona nova funcionalidade'`)
-4. Push para a branch (`git push origin feature/nova-funcionalidade`)
-5. Abra um Pull Request
-
-## 📄 Licença
-
-Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
+# Deploy
+docker run -d -p 3000:3000 aca-backend:prod
+```
 
 ---
 
-**Desenvolvido com ❤️ pela equipe ACA**
+**Desenvolvido com ❤️ pela equipe RESTACK**
