@@ -28,13 +28,53 @@ export class DocumentsService {
   }
 
   async list(companyId: string, query: DocumentListQueryDto) {
-    const { docType, page = 1, pageSize = 10 } = query;
+    const { docType, status, page = 1, pageSize = 10, search } = query;
     const skip = (page - 1) * pageSize;
 
-    const where = {
+    // Construir filtros baseados nos parâmetros
+    const where: any = {
       companyId,
       ...(docType && { docType }),
     };
+
+    // Filtro por status usando a view
+    if (status) {
+      const now = new Date();
+      const fifteenDaysFromNow = new Date();
+      fifteenDaysFromNow.setDate(now.getDate() + 15);
+
+      switch (status) {
+        case 'Válido':
+          where.expiresAt = {
+            gt: fifteenDaysFromNow,
+          };
+          break;
+        case 'À vencer':
+          where.expiresAt = {
+            gte: now,
+            lte: fifteenDaysFromNow,
+          };
+          break;
+        case 'Expirado':
+          where.expiresAt = {
+            lt: now,
+          };
+          break;
+        case 'Sem validade':
+          where.expiresAt = null;
+          break;
+      }
+    }
+
+    // Filtro de busca por número do documento, observações, emissor ou nome do cliente
+    if (search) {
+      where.OR = [
+        { docNumber: { contains: search, mode: 'insensitive' } },
+        { notes: { contains: search, mode: 'insensitive' } },
+        { issuer: { contains: search, mode: 'insensitive' } },
+        { clientName: { contains: search, mode: 'insensitive' } },
+      ];
+    }
 
     const [documents, total] = await Promise.all([
       this.prisma.companyDocument.findMany({
@@ -42,6 +82,7 @@ export class DocumentsService {
         select: {
           id: true,
           docType: true,
+          clientName: true,
           docNumber: true,
           issuer: true,
           issueDate: true,
@@ -55,21 +96,39 @@ export class DocumentsService {
           createdAt: true,
           updatedAt: true,
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { expiresAt: 'desc' }, // Ordenar por data de expiração
         skip,
         take: pageSize,
       }),
       this.prisma.companyDocument.count({ where }),
     ]);
 
-    // Converter BigInt para string em todos os documentos
-    const documentsWithStringFileSize = documents.map(doc => ({
-      ...doc,
-      fileSize: doc.fileSize ? doc.fileSize.toString() : null,
-    }));
+    // Calcular status para cada documento
+    const documentsWithStatus = documents.map(doc => {
+      let statusCalc = 'Sem validade';
+      if (doc.expiresAt) {
+        const now = new Date();
+        const fifteenDaysFromNow = new Date();
+        fifteenDaysFromNow.setDate(now.getDate() + 15);
+
+        if (doc.expiresAt < now) {
+          statusCalc = 'Expirado';
+        } else if (doc.expiresAt <= fifteenDaysFromNow) {
+          statusCalc = 'À vencer';
+        } else {
+          statusCalc = 'Válido';
+        }
+      }
+
+      return {
+        ...doc,
+        fileSize: doc.fileSize ? doc.fileSize.toString() : null,
+        status: statusCalc,
+      };
+    });
 
     return {
-      documents: documentsWithStringFileSize,
+      documents: documentsWithStatus,
       pagination: {
         page,
         pageSize,
@@ -80,7 +139,18 @@ export class DocumentsService {
   }
 
   create(companyId: string, dto: CreateCompanyDocDto) {
-    return this.prisma.companyDocument.create({ data: { companyId, ...dto } });
+    return this.prisma.companyDocument.create({ 
+      data: { 
+        companyId, 
+        docType: dto.docType,
+        clientName: dto.clientName,
+        docNumber: dto.docNumber,
+        issuer: dto.issuer,
+        issueDate: dto.issueDate ? new Date(dto.issueDate) : null,
+        expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : null,
+        notes: dto.notes,
+      } 
+    });
   }
 
   async upload(companyId: string, dto: UploadDocumentDto, file: Express.Multer.File) {
@@ -140,6 +210,7 @@ export class DocumentsService {
         data: {
           companyId,
           docType: dto.docType,
+          clientName: dto.clientName,
           docNumber: dto.docNumber,
           issuer: dto.issuer,
           issueDate: dto.issueDate ? new Date(dto.issueDate) : null,
@@ -328,6 +399,7 @@ export class DocumentsService {
       data: {
         companyId,
         docType: originalDoc.docType,
+        clientName: dto.clientName ?? originalDoc.clientName,
         docNumber: dto.docNumber ?? originalDoc.docNumber,
         issuer: dto.issuer ?? originalDoc.issuer,
         issueDate: dto.issueDate ? new Date(dto.issueDate) : originalDoc.issueDate,

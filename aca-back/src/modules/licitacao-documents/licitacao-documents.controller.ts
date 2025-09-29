@@ -4,12 +4,16 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import { JwtAuthGuard } from '../../core/security/jwt-auth.guard';
 import { CompanyGuard } from '../../core/tenancy/company.guard';
+import { ActiveCompanyGuard } from '../../core/tenancy/active-company.guard';
+import { ActiveCompany } from '../../core/tenancy/active-company.decorator';
+import { RolesGuard } from '../../core/security/roles.guard';
+import { Roles } from '../../core/security/roles.decorator';
 import { CreateLicitacaoDocDto, UpdateLicitacaoDocDto, LicitacaoDocResponseDto, UploadLicitacaoDocumentDto, LicitacaoDocumentListQueryDto } from './dto/licitacao-doc.dto';
 import { LicitacaoDocumentsService } from './licitacao-documents.service';
 
 @ApiTags('Licitacao Documents')
 @ApiBearerAuth('bearer')
-@UseGuards(JwtAuthGuard, CompanyGuard)
+@UseGuards(JwtAuthGuard, ActiveCompanyGuard)
 @Controller('licitacoes/:licitacaoId/documents')
 export class LicitacaoDocumentsController {
   constructor(private readonly svc: LicitacaoDocumentsService) {}
@@ -28,12 +32,15 @@ export class LicitacaoDocumentsController {
     return this.svc.create(licitacaoId, dto);
   }
 
+  @UseGuards(RolesGuard)
+  @Roles('owner', 'admin', 'member')
   @Post('upload')
   @ApiOperation({ summary: 'Upload de documento com arquivo' })
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('file'))
   @ApiResponse({ status: 201, description: 'Documento enviado com sucesso' })
   async upload(
+    @ActiveCompany() company: any,
     @Param('licitacaoId') licitacaoId: string,
     @Body() dto: UploadLicitacaoDocumentDto,
     @UploadedFile() file: Express.Multer.File,
@@ -41,7 +48,7 @@ export class LicitacaoDocumentsController {
     if (!file) {
       throw new Error('Arquivo é obrigatório');
     }
-    return this.svc.upload(licitacaoId, dto, file);
+    return this.svc.upload(company.id, licitacaoId, dto, file);
   }
 
   @Get(':id/content')
@@ -71,6 +78,8 @@ export class LicitacaoDocumentsController {
     return this.svc.getDocumentMeta(licitacaoId, docId);
   }
 
+  @UseGuards(RolesGuard)
+  @Roles('owner', 'admin', 'member')
   @Delete(':id')
   @ApiOperation({ summary: 'Excluir documento' })
   @ApiResponse({ status: 200, description: 'Documento excluído com sucesso' })
@@ -78,12 +87,15 @@ export class LicitacaoDocumentsController {
     return this.svc.deleteDocument(licitacaoId, docId);
   }
 
+  @UseGuards(RolesGuard)
+  @Roles('owner', 'admin', 'member')
   @Post(':id/reupload')
   @ApiOperation({ summary: 'Reupload de documento (nova versão)' })
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('file'))
   @ApiResponse({ status: 201, description: 'Nova versão do documento criada' })
   async reupload(
+    @ActiveCompany() company: any,
     @Param('licitacaoId') licitacaoId: string,
     @Param('id') docId: string,
     @Body() dto: UploadLicitacaoDocumentDto,
@@ -92,6 +104,6 @@ export class LicitacaoDocumentsController {
     if (!file) {
       throw new Error('Arquivo é obrigatório');
     }
-    return this.svc.reuploadDocument(licitacaoId, docId, dto, file);
+    return this.svc.reuploadDocument(company.id, licitacaoId, docId, dto, file);
   }
 }

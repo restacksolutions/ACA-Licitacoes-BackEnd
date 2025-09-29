@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = "file:./dev.db"
 }
 
 enum RoleCompany {
@@ -68,15 +68,16 @@ model CompanyDocument {
   id          String    @id @default(uuid())
   companyId   String    @map("company_id")
   docType     String    @map("doc_type")
+  clientName  String    @map("client_name")
   docNumber   String?   @map("doc_number")
   issuer      String?
-  issueDate   DateTime? @map("issue_date") @db.Date
-  expiresAt   DateTime? @map("expires_at") @db.Date
+  issueDate   DateTime? @map("issue_date")
+  expiresAt   DateTime? @map("expires_at")
   // LEGADO
   filePath    String?   @map("file_path")
   
   // NOVO (BYTEA + metadados)
-  fileBytes   Bytes?    @db.ByteA
+  fileBytes   Bytes?
   mimeType    String?   @default("application/pdf") @map("mime_type")
   fileSize    BigInt?   @map("file_size")
   sha256Hex   String?   @map("sha256_hex")
@@ -102,7 +103,7 @@ model Licitacao {
   sessionAt         DateTime?       @map("session_at")
   submissionDeadline DateTime?      @map("submission_deadline")
   status            LicitacaoStatus @default(draft)
-  saleValue         Decimal?        @map("sale_value") @db.Decimal
+  saleValue         Decimal?        @map("sale_value")
   notes             String?
   createdAt         DateTime        @default(now()) @map("created_at")
   updatedAt         DateTime        @updatedAt @map("updated_at")
@@ -120,14 +121,14 @@ model LicitacaoDocument {
   required                Boolean   @default(true)
   submitted               Boolean   @default(false)
   signed                  Boolean   @default(false)
-  issueDate               DateTime? @map("issue_date") @db.Date
-  expiresAt               DateTime? @map("expires_at") @db.Date
+  issueDate               DateTime? @map("issue_date")
+  expiresAt               DateTime? @map("expires_at")
   // LEGADO
   filePath                String?   @map("file_path")
   templatePath            String?   @map("template_path")
   
   // NOVO (BYTEA + metadados)
-  fileBytes               Bytes?    @db.ByteA
+  fileBytes               Bytes?
   mimeType                String?   @default("application/pdf") @map("mime_type")
   fileSize                BigInt?   @map("file_size")
   sha256Hex               String?   @map("sha256_hex")
@@ -172,7 +173,7 @@ model VehicleModel {
   modelName String   @map("model_name")
   yearFrom  Int?     @map("year_from")
   yearTo    Int?     @map("year_to")
-  specs     Json     @default("{}")
+  specs     Json?
   extraInfo String?  @map("extra_info")
   brand     CarBrand @relation(fields: [brandId], references: [id])
 

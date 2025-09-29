@@ -3,29 +3,29 @@ import { ApiBearerAuth, ApiConsumes, ApiTags, ApiOperation, ApiResponse } from '
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import { JwtAuthGuard } from '../../core/security/jwt-auth.guard';
-import { CompanyGuard } from '../../core/tenancy/company.guard';
+import { ActiveCompany } from '../../core/tenancy/active-company.decorator';
 import { CreateCompanyDocDto, UpdateCompanyDocDto, CompanyDocResponseDto, UploadDocumentDto, DocumentListQueryDto } from './dto/doc.dto';
 import { DocumentsService } from './documents.service';
 
 @ApiTags('Company Documents')
 @ApiBearerAuth('bearer')
-@UseGuards(JwtAuthGuard, CompanyGuard)
-@Controller('companies/:companyId/documents')
+@UseGuards(JwtAuthGuard)
+@Controller('documents')
 export class DocumentsController {
   constructor(private readonly svc: DocumentsService) {}
 
   @Get()
   @ApiOperation({ summary: 'Listar documentos da empresa' })
   @ApiResponse({ status: 200, description: 'Lista de documentos com paginação' })
-  list(@Param('companyId') companyId: string, @Query() query: DocumentListQueryDto) {
-    return this.svc.list(companyId, query);
+  list(@ActiveCompany() company: any, @Query() query: DocumentListQueryDto) {
+    return this.svc.list(company.id, query);
   }
 
   @Post()
   @ApiOperation({ summary: 'Criar documento sem arquivo' })
   @ApiResponse({ status: 201, description: 'Documento criado com sucesso' })
-  create(@Param('companyId') companyId: string, @Body() dto: CreateCompanyDocDto) {
-    return this.svc.create(companyId, dto);
+  create(@ActiveCompany() company: any, @Body() dto: CreateCompanyDocDto) {
+    return this.svc.create(company.id, dto);
   }
 
   @Post('upload')
@@ -34,12 +34,12 @@ export class DocumentsController {
   @UseInterceptors(FileInterceptor('file'))
   @ApiResponse({ status: 201, description: 'Documento enviado com sucesso' })
   async upload(
-    @Param('companyId') companyId: string,
+    @ActiveCompany() company: any,
     @Body() dto: UploadDocumentDto,
     @UploadedFile() file: Express.Multer.File,
   ) {
     console.log(`[DocumentsController.upload] ===== INICIANDO UPLOAD =====`);
-    console.log(`[DocumentsController.upload] CompanyId: ${companyId}`);
+    console.log(`[DocumentsController.upload] CompanyId: ${company.id}`);
     console.log(`[DocumentsController.upload] DTO:`, dto);
     console.log(`[DocumentsController.upload] File:`, file ? {
       originalname: file.originalname,
@@ -53,7 +53,7 @@ export class DocumentsController {
         throw new Error('Arquivo é obrigatório');
       }
       
-      const result = await this.svc.upload(companyId, dto, file);
+      const result = await this.svc.upload(company.id, dto, file);
       console.log(`[DocumentsController.upload] Upload realizado com sucesso`);
       return result;
     } catch (error) {
@@ -67,11 +67,11 @@ export class DocumentsController {
   @ApiResponse({ status: 200, description: 'Conteúdo do documento' })
   @Header('Cache-Control', 'public, max-age=3600')
   async getContent(
-    @Param('companyId') companyId: string,
+    @ActiveCompany() company: any,
     @Param('id') docId: string,
     @Res() res: Response,
   ) {
-    const { buffer, mimeType, sha256Hex } = await this.svc.getDocumentContent(companyId, docId);
+    const { buffer, mimeType, sha256Hex } = await this.svc.getDocumentContent(company.id, docId);
     
     res.set({
       'Content-Type': mimeType,
@@ -85,23 +85,23 @@ export class DocumentsController {
   @Get(':id/meta')
   @ApiOperation({ summary: 'Obter metadados do documento' })
   @ApiResponse({ status: 200, description: 'Metadados do documento' })
-  getMeta(@Param('companyId') companyId: string, @Param('id') docId: string) {
-    return this.svc.getDocumentMeta(companyId, docId);
+  getMeta(@ActiveCompany() company: any, @Param('id') docId: string) {
+    return this.svc.getDocumentMeta(company.id, docId);
   }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Atualizar metadados do documento' })
   @ApiResponse({ status: 200, description: 'Documento atualizado com sucesso' })
-  update(@Param('companyId') companyId: string, @Param('id') docId: string, @Body() dto: UpdateCompanyDocDto) {
-    return this.svc.updateDocument(companyId, docId, dto);
+  update(@ActiveCompany() company: any, @Param('id') docId: string, @Body() dto: UpdateCompanyDocDto) {
+    return this.svc.updateDocument(company.id, docId, dto);
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Excluir documento' })
   @ApiResponse({ status: 200, description: 'Documento excluído com sucesso' })
-  async delete(@Param('companyId') companyId: string, @Param('id') docId: string) {
+  async delete(@ActiveCompany() company: any, @Param('id') docId: string) {
     try {
-      const result = await this.svc.deleteDocument(companyId, docId);
+      const result = await this.svc.deleteDocument(company.id, docId);
       return { success: true, message: 'Documento excluído com sucesso', data: result };
     } catch (error) {
       console.error('Erro ao excluir documento:', error);
@@ -115,7 +115,7 @@ export class DocumentsController {
   @UseInterceptors(FileInterceptor('file'))
   @ApiResponse({ status: 201, description: 'Nova versão do documento criada' })
   async reupload(
-    @Param('companyId') companyId: string,
+    @ActiveCompany() company: any,
     @Param('id') docId: string,
     @Body() dto: UploadDocumentDto,
     @UploadedFile() file: Express.Multer.File,
@@ -123,6 +123,6 @@ export class DocumentsController {
     if (!file) {
       throw new Error('Arquivo é obrigatório');
     }
-    return this.svc.reuploadDocument(companyId, docId, dto, file);
+    return this.svc.reuploadDocument(company.id, docId, dto, file);
   }
 }

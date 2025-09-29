@@ -7,6 +7,10 @@ export class CreateCompanyDocDto {
   @IsString()
   docType!: string;
 
+  @ApiProperty({ example: 'Cliente ABC Ltda' })
+  @IsString()
+  clientName!: string;
+
   @ApiPropertyOptional({ example: '12.345.678/0001-90' })
   @IsString()
   @IsOptional()
@@ -38,6 +42,11 @@ export class UpdateCompanyDocDto {
   @IsString()
   @IsOptional()
   docType?: string;
+
+  @ApiPropertyOptional({ example: 'Cliente ABC Ltda' })
+  @IsString()
+  @IsOptional()
+  clientName?: string;
 
   @ApiPropertyOptional({ example: '12.345.678/0001-90' })
   @IsString()
@@ -72,6 +81,9 @@ export class CompanyDocResponseDto {
   @ApiProperty({ example: 'CNPJ' })
   docType!: string;
 
+  @ApiProperty({ example: 'Cliente ABC Ltda' })
+  clientName!: string;
+
   @ApiPropertyOptional({ example: '12.345.678/0001-90' })
   docNumber?: string;
 
@@ -102,6 +114,13 @@ export class CompanyDocResponseDto {
   @ApiProperty({ example: 1 })
   version!: number;
 
+  @ApiProperty({ 
+    example: 'Válido',
+    enum: ['Válido', 'À vencer', 'Expirado', 'Sem validade'],
+    description: 'Status calculado do documento'
+  })
+  status!: string;
+
   @ApiProperty({ example: '2025-09-22T20:30:00.000Z' })
   createdAt!: string;
 
@@ -113,6 +132,10 @@ export class UploadDocumentDto {
   @ApiProperty({ example: 'CNPJ' })
   @IsString()
   docType!: string;
+
+  @ApiProperty({ example: 'Cliente ABC Ltda' })
+  @IsString()
+  clientName!: string;
 
   @ApiPropertyOptional({ example: '12.345.678/0001-90' })
   @IsString()
@@ -145,6 +168,23 @@ export class DocumentListQueryDto {
   @IsString()
   @IsOptional()
   docType?: string;
+
+  @ApiPropertyOptional({ 
+    example: 'Válido',
+    enum: ['Válido', 'À vencer', 'Expirado', 'Sem validade'],
+    description: 'Filtrar por status do documento'
+  })
+  @IsString()
+  @IsOptional()
+  status?: 'Válido' | 'À vencer' | 'Expirado' | 'Sem validade';
+
+  @ApiPropertyOptional({ 
+    example: '12345678',
+    description: 'Buscar por número do documento, emissor ou observações'
+  })
+  @IsString()
+  @IsOptional()
+  search?: string;
 
   @ApiPropertyOptional({ example: 1 })
   @IsNumber()

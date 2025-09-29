@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, MiddlewareConsumer, NestModule, RequestMethod } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from './core/config/config.module';
 import { LoggerModule } from './core/logger/logger.module';
@@ -6,6 +6,7 @@ import { PrismaModule } from './core/prisma/prisma.module';
 import { JwtStrategy } from './core/security/jwt.strategy';
 import { JwtAuthGuard } from './core/security/jwt-auth.guard';
 import { SupabaseAuthService } from './core/auth/supabase-auth.service';
+import { CompanyContextMiddleware } from './core/tenancy/company-context.middleware';
 
 import { SupabaseStorage } from './adapters/storage/supabase.storage';
 
@@ -44,7 +45,15 @@ import { AuditModule } from './modules/audit/audit.module';
     JwtStrategy,
     SupabaseAuthService,
     SupabaseStorage,
+    CompanyContextMiddleware,
     { provide: APP_GUARD, useClass: JwtAuthGuard }, // protege tudo por padrão
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    // Middleware aplicado globalmente, mas com verificação interna para rotas públicas
+    consumer
+      .apply(CompanyContextMiddleware)
+      .forRoutes('*');
+  }
+}

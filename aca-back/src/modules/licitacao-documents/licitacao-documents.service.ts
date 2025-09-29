@@ -85,7 +85,16 @@ export class LicitacaoDocumentsService {
     return this.prisma.licitacaoDocument.create({ data: { licitacaoId, ...dto } });
   }
 
-  async upload(licitacaoId: string, dto: UploadLicitacaoDocumentDto, file: Express.Multer.File) {
+  async upload(companyId: string, licitacaoId: string, dto: UploadLicitacaoDocumentDto, file: Express.Multer.File) {
+    // Verificar se a licitação pertence à empresa
+    const licitacao = await this.prisma.licitacao.findFirst({
+      where: { id: licitacaoId, companyId },
+    });
+    
+    if (!licitacao) {
+      throw new BadRequestException('Licitação não encontrada ou não pertence à empresa');
+    }
+
     // Validar tamanho do arquivo
     if (file.size > this.MAX_FILE_SIZE) {
       throw new BadRequestException('Arquivo muito grande. Máximo 20MB.');
@@ -209,7 +218,16 @@ export class LicitacaoDocumentsService {
     });
   }
 
-  async reuploadDocument(licitacaoId: string, docId: string, dto: UploadLicitacaoDocumentDto, file: Express.Multer.File) {
+  async reuploadDocument(companyId: string, licitacaoId: string, docId: string, dto: UploadLicitacaoDocumentDto, file: Express.Multer.File) {
+    // Verificar se a licitação pertence à empresa
+    const licitacao = await this.prisma.licitacao.findFirst({
+      where: { id: licitacaoId, companyId },
+    });
+    
+    if (!licitacao) {
+      throw new BadRequestException('Licitação não encontrada ou não pertence à empresa');
+    }
+
     // Buscar documento original
     const originalDoc = await this.prisma.licitacaoDocument.findFirst({
       where: { id: docId, licitacaoId },
