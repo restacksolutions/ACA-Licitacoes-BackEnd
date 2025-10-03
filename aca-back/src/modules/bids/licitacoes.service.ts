@@ -110,11 +110,7 @@ export class LicitacoesService {
           issueDate: true,
           expiresAt: true,
           version: true,
-          notes: true,
-          fileSize: true,
-          mimeType: true,
-          sha256Hex: true,
-        },
+          notes: true,},
       });
 
       console.log(`[LicitacoesService.get] Documentos encontrados: ${documents.length}`);
@@ -128,7 +124,6 @@ export class LicitacoesService {
         saleValue: licitacao.saleValue ? licitacao.saleValue.toString() : null,
         documents: documents.map(doc => ({
           ...doc,
-          fileSize: doc.fileSize ? doc.fileSize.toString() : null,
         })),
         conformidade,
       };
@@ -305,7 +300,6 @@ export class LicitacoesService {
           version: doc.version,
           notes: doc.notes,
           // Converter BigInt para string se existir
-          fileSize: doc.fileSize ? doc.fileSize.toString() : null,
         })),
       };
 

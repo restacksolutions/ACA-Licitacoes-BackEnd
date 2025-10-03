@@ -8,7 +8,7 @@ import { ActiveCompanyGuard } from '../../core/tenancy/active-company.guard';
 import { ActiveCompany } from '../../core/tenancy/active-company.decorator';
 import { RolesGuard } from '../../core/security/roles.guard';
 import { Roles } from '../../core/security/roles.decorator';
-import { CreateLicitacaoDocDto, UpdateLicitacaoDocDto, LicitacaoDocResponseDto, UploadLicitacaoDocumentDto, LicitacaoDocumentListQueryDto } from './dto/licitacao-doc.dto';
+import { CreateLicitacaoDocumentDto, UpdateLicitacaoDocumentDto, UploadLicitacaoDocumentDto, LicitacaoDocumentListQueryDto } from './dto/licitacao-document.dto';
 import { LicitacaoDocumentsService } from './licitacao-documents.service';
 
 @ApiTags('Licitacao Documents')
@@ -22,13 +22,13 @@ export class LicitacaoDocumentsController {
   @ApiOperation({ summary: 'Listar documentos da licitação' })
   @ApiResponse({ status: 200, description: 'Lista de documentos com paginação' })
   list(@Param('licitacaoId') licitacaoId: string, @Query() query: LicitacaoDocumentListQueryDto) {
-    return this.svc.list(licitacaoId, query);
+    return this.svc.findAll(licitacaoId, query.page, query.limit);
   }
 
   @Post()
   @ApiOperation({ summary: 'Criar documento sem arquivo' })
   @ApiResponse({ status: 201, description: 'Documento criado com sucesso' })
-  create(@Param('licitacaoId') licitacaoId: string, @Body() dto: CreateLicitacaoDocDto) {
+  create(@Param('licitacaoId') licitacaoId: string, @Body() dto: CreateLicitacaoDocumentDto) {
     return this.svc.create(licitacaoId, dto);
   }
 
@@ -48,7 +48,7 @@ export class LicitacaoDocumentsController {
     if (!file) {
       throw new Error('Arquivo é obrigatório');
     }
-    return this.svc.upload(company.id, licitacaoId, dto, file);
+    return this.svc.upload(licitacaoId, dto, file);
   }
 
   @Get(':id/content')
@@ -60,15 +60,14 @@ export class LicitacaoDocumentsController {
     @Param('id') docId: string,
     @Res() res: Response,
   ) {
-    const { buffer, mimeType, sha256Hex } = await this.svc.getDocumentContent(licitacaoId, docId);
+    const { filePath, downloadUrl, fileName } = await this.svc.getDocumentContent(licitacaoId, docId);
     
     res.set({
-      'Content-Type': mimeType,
-      'ETag': sha256Hex,
-      'Content-Length': buffer.length.toString(),
+      'Content-Type': 'application/octet-stream',
+      'Content-Disposition': `attachment; filename="${fileName}"`
     });
     
-    res.send(buffer);
+    res.redirect(downloadUrl);
   }
 
   @Get(':id/meta')

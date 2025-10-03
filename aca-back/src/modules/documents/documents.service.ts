@@ -1,422 +1,283 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../core/prisma/prisma.service';
-import { CreateCompanyDocDto, UpdateCompanyDocDto, UploadDocumentDto, DocumentListQueryDto } from './dto/doc.dto';
-import { createHash } from 'crypto';
+import { CreateCompanyDocDto, UpdateCompanyDocDto, UploadDocumentDto } from './dto/document.dto';
+import { Prisma } from '@prisma/client';
+import { SupabaseStorage } from '../../adapters/storage/supabase.storage';
 
 @Injectable()
 export class DocumentsService {
-  private readonly MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
+  constructor(
+    private prisma: PrismaService,
+    private storage: SupabaseStorage
+  ) {}
 
-  constructor(private prisma: PrismaService) {}
-
-  async streamToBufferAndHash(stream: NodeJS.ReadableStream, maxBytes: number) {
-    const hash = createHash('sha256');
-    const chunks: Buffer[] = [];
-    let total = 0;
-
-    for await (const chunk of stream) {
-      const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-      total += buf.length;
-      if (total > maxBytes) throw new BadRequestException('Arquivo muito grande');
-      hash.update(buf);
-      chunks.push(buf);
-    }
-
-    const buffer = Buffer.concat(chunks);
-    const sha256Hex = hash.digest('hex');
-    return { buffer, size: total, sha256Hex };
-  }
-
-  async list(companyId: string, query: DocumentListQueryDto) {
-    const { docType, status, page = 1, pageSize = 10, search } = query;
-    const skip = (page - 1) * pageSize;
-
-    // Construir filtros baseados nos parâmetros
-    const where: any = {
+  async findAll(companyId: string, page: number = 1, limit: number = 10, search?: string) {
+    const skip = (page - 1) * limit;
+    
+    const where = {
       companyId,
-      ...(docType && { docType }),
+      ...(search && {
+        OR: [
+          { docNumber: { contains: search } },
+          { issuer: { contains: search } },
+          { notes: { contains: search } }
+        ]
+      })
     };
-
-    // Filtro por status usando a view
-    if (status) {
-      const now = new Date();
-      const fifteenDaysFromNow = new Date();
-      fifteenDaysFromNow.setDate(now.getDate() + 15);
-
-      switch (status) {
-        case 'Válido':
-          where.expiresAt = {
-            gt: fifteenDaysFromNow,
-          };
-          break;
-        case 'À vencer':
-          where.expiresAt = {
-            gte: now,
-            lte: fifteenDaysFromNow,
-          };
-          break;
-        case 'Expirado':
-          where.expiresAt = {
-            lt: now,
-          };
-          break;
-        case 'Sem validade':
-          where.expiresAt = null;
-          break;
-      }
-    }
-
-    // Filtro de busca por número do documento, observações, emissor ou nome do cliente
-    if (search) {
-      where.OR = [
-        { docNumber: { contains: search, mode: 'insensitive' } },
-        { notes: { contains: search, mode: 'insensitive' } },
-        { issuer: { contains: search, mode: 'insensitive' } },
-        { clientName: { contains: search, mode: 'insensitive' } },
-      ];
-    }
 
     const [documents, total] = await Promise.all([
       this.prisma.companyDocument.findMany({
         where,
-        select: {
-          id: true,
-          docType: true,
-          clientName: true,
-          docNumber: true,
-          issuer: true,
-          issueDate: true,
-          expiresAt: true,
-          filePath: true,
-          mimeType: true,
-          fileSize: true,
-          sha256Hex: true,
-          notes: true,
-          version: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-        orderBy: { expiresAt: 'desc' }, // Ordenar por data de expiração
         skip,
-        take: pageSize,
+        take: limit,
+        orderBy: { createdAt: 'desc' }
       }),
-      this.prisma.companyDocument.count({ where }),
+      this.prisma.companyDocument.count({ where })
     ]);
 
-    // Calcular status para cada documento
-    const documentsWithStatus = documents.map(doc => {
-      let statusCalc = 'Sem validade';
-      if (doc.expiresAt) {
-        const now = new Date();
-        const fifteenDaysFromNow = new Date();
-        fifteenDaysFromNow.setDate(now.getDate() + 15);
-
-        if (doc.expiresAt < now) {
-          statusCalc = 'Expirado';
-        } else if (doc.expiresAt <= fifteenDaysFromNow) {
-          statusCalc = 'À vencer';
-        } else {
-          statusCalc = 'Válido';
-        }
-      }
-
-      return {
-        ...doc,
-        fileSize: doc.fileSize ? doc.fileSize.toString() : null,
-        status: statusCalc,
-      };
-    });
-
     return {
-      documents: documentsWithStatus,
+      documents,
       pagination: {
         page,
-        pageSize,
+        limit,
         total,
-        totalPages: Math.ceil(total / pageSize),
-      },
+        pages: Math.ceil(total / limit)
+      }
     };
   }
 
-  create(companyId: string, dto: CreateCompanyDocDto) {
-    return this.prisma.companyDocument.create({ 
-      data: { 
-        companyId, 
-        docType: dto.docType,
-        clientName: dto.clientName,
-        docNumber: dto.docNumber,
-        issuer: dto.issuer,
-        issueDate: dto.issueDate ? new Date(dto.issueDate) : null,
-        expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : null,
-        notes: dto.notes,
-      } 
+  async findOne(companyId: string, docId: string) {
+    const document = await this.prisma.companyDocument.findFirst({
+      where: { id: docId, companyId }
+    });
+
+    if (!document) {
+      throw new NotFoundException('Documento não encontrado');
+    }
+
+    return document;
+  }
+
+  async create(companyId: string, dto: CreateCompanyDocDto) {
+    // Formatar docType no formato {Cliente - Tipo documento}
+    const clientName = 'Cliente'; // Para create, usar nome padrão
+    const docTypeLabel = this.getDocTypeLabel(dto.docType);
+    const formattedDocType = `${clientName} - ${docTypeLabel}`;
+    
+    return this.prisma.companyDocument.create({
+      data: {
+        ...dto,
+        docType: formattedDocType, // Usar string formatada
+        companyId
+      }
     });
   }
 
   async upload(companyId: string, dto: UploadDocumentDto, file: Express.Multer.File) {
-    console.log(`[DocumentsService.upload] ===== INICIANDO UPLOAD =====`);
-    console.log(`[DocumentsService.upload] CompanyId: ${companyId}`);
-    console.log(`[DocumentsService.upload] DTO:`, dto);
-    console.log(`[DocumentsService.upload] File:`, {
-      originalname: file.originalname,
-      mimetype: file.mimetype,
-      size: file.size
-    });
-    
     try {
-      // Validar tamanho do arquivo
-      if (file.size > this.MAX_FILE_SIZE) {
-        console.log(`[DocumentsService.upload] Arquivo muito grande: ${file.size} bytes`);
-        throw new BadRequestException('Arquivo muito grande. Máximo 20MB.');
-      }
-
-      // Validar tipo MIME
-      const allowedMimes = ['application/pdf', 'image/jpeg', 'image/png'];
-      if (!allowedMimes.includes(file.mimetype)) {
-        console.log(`[DocumentsService.upload] Tipo MIME não permitido: ${file.mimetype}`);
-        throw new BadRequestException('Tipo de arquivo não permitido. Use PDF, JPEG ou PNG.');
-      }
-
-      // Calcular hash SHA-256
-      console.log(`[DocumentsService.upload] Calculando hash SHA-256...`);
-      const hash = createHash('sha256');
-      hash.update(file.buffer);
-      const sha256Hex = hash.digest('hex');
-      console.log(`[DocumentsService.upload] Hash calculado: ${sha256Hex.substring(0, 10)}...`);
-
-      // Verificar se já existe documento com mesmo hash
-      console.log(`[DocumentsService.upload] Verificando documento existente...`);
-      const existingDoc = await this.prisma.companyDocument.findFirst({
-        where: { companyId, sha256Hex },
-      });
-
-      if (existingDoc) {
-        console.log(`[DocumentsService.upload] Documento com mesmo hash já existe`);
-        throw new BadRequestException('Documento com mesmo conteúdo já existe');
-      }
-
-      // Obter próxima versão
-      console.log(`[DocumentsService.upload] Obtendo próxima versão...`);
-      const lastVersion = await this.prisma.companyDocument.aggregate({
-        where: { companyId, docType: dto.docType },
-        _max: { version: true },
-      });
-      const version = (lastVersion._max.version ?? 0) + 1;
-      console.log(`[DocumentsService.upload] Próxima versão: ${version}`);
-
-      // Criar novo documento
-      console.log(`[DocumentsService.upload] Criando documento no banco...`);
-      const document = await this.prisma.companyDocument.create({
+      // Formatar docType no formato {Cliente - Tipo documento}
+      const clientName = dto.clientName || 'Cliente';
+      const docTypeLabel = this.getDocTypeLabel(dto.docType);
+      const formattedDocType = `${clientName} - ${docTypeLabel}`;
+      
+      // Gerar nome único para o arquivo
+      const timestamp = Date.now();
+      const fileExtension = file.originalname.split('.').pop() || 'pdf';
+      const fileName = `${formattedDocType.replace(/[^a-zA-Z0-9]/g, '_')}_${timestamp}.${fileExtension}`;
+      const filePath = `documents/${companyId}/${fileName}`;
+      
+      // Upload para Supabase Storage
+      const uploadResult = await this.storage.uploadObject(
+        filePath,
+        file.buffer,
+        file.mimetype
+      );
+      
+      console.log(`[DocumentsService.upload] Arquivo enviado para Supabase Storage: ${uploadResult.path}`);
+      
+      // Salvar no banco de dados
+      return this.prisma.companyDocument.create({
         data: {
           companyId,
-          docType: dto.docType,
-          clientName: dto.clientName,
+          docType: formattedDocType,
           docNumber: dto.docNumber,
           issuer: dto.issuer,
           issueDate: dto.issueDate ? new Date(dto.issueDate) : null,
           expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : null,
-          notes: dto.notes,
-          version,
-          fileBytes: file.buffer,
-          mimeType: file.mimetype,
-          fileSize: BigInt(file.size),
-          sha256Hex,
-        },
+          filePath: uploadResult.path, // Caminho real no Supabase Storage
+          notes: dto.notes
+        }
       });
-
-      console.log(`[DocumentsService.upload] Documento criado com sucesso: ${document.id}`);
-
-      // Converter BigInt para string para serialização JSON
-      return {
-        ...document,
-        fileSize: document.fileSize ? document.fileSize.toString() : null,
-      };
     } catch (error) {
-      console.error(`[DocumentsService.upload] Erro no upload:`, error);
-      throw error;
+      console.error('[DocumentsService.upload] Erro no upload:', error);
+      throw new BadRequestException(`Erro ao fazer upload do arquivo: ${error.message}`);
     }
   }
 
   async getDocumentContent(companyId: string, docId: string) {
-    const doc = await this.prisma.companyDocument.findFirst({
-      where: { id: docId, companyId },
-      select: { fileBytes: true, mimeType: true, sha256Hex: true },
-    });
-
-    if (!doc?.fileBytes) {
-      throw new NotFoundException('Documento não encontrado');
+    const document = await this.findOne(companyId, docId);
+    
+    if (!document.filePath) {
+      throw new NotFoundException('Arquivo não encontrado');
     }
 
-    return {
-      buffer: Buffer.from(doc.fileBytes as Buffer),
-      mimeType: doc.mimeType ?? 'application/pdf',
-      sha256Hex: doc.sha256Hex,
-    };
+    try {
+      // Baixar arquivo do Supabase Storage
+      const fileBuffer = await this.storage.downloadObject(document.filePath);
+      const fileName = document.filePath.split('/').pop() || 'documento.pdf';
+      
+      // Determinar tipo MIME baseado na extensão
+      const extension = fileName.split('.').pop()?.toLowerCase();
+      let mimeType = 'application/octet-stream';
+      
+      switch (extension) {
+        case 'pdf':
+          mimeType = 'application/pdf';
+          break;
+        case 'jpg':
+        case 'jpeg':
+          mimeType = 'image/jpeg';
+          break;
+        case 'png':
+          mimeType = 'image/png';
+          break;
+        case 'doc':
+          mimeType = 'application/msword';
+          break;
+        case 'docx':
+          mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+          break;
+        case 'xls':
+          mimeType = 'application/vnd.ms-excel';
+          break;
+        case 'xlsx':
+          mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+          break;
+      }
+      
+      return {
+        filePath: document.filePath,
+        fileName: fileName,
+        content: fileBuffer,
+        mimeType: mimeType
+      };
+    } catch (error) {
+      console.error('[DocumentsService.getDocumentContent] Erro ao baixar arquivo:', error);
+      throw new NotFoundException('Erro ao baixar arquivo do storage');
+    }
   }
 
   async getDocumentMeta(companyId: string, docId: string) {
-    const doc = await this.prisma.companyDocument.findFirst({
-      where: { id: docId, companyId },
-      select: {
-        id: true,
-        docType: true,
-        docNumber: true,
-        issuer: true,
-        issueDate: true,
-        expiresAt: true,
-        filePath: true,
-        mimeType: true,
-        fileSize: true,
-        sha256Hex: true,
-        notes: true,
-        version: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
-
-    if (!doc) {
-      throw new NotFoundException('Documento não encontrado');
-    }
-
-    // Converter BigInt para string para serialização JSON
-    return {
-      ...doc,
-      fileSize: doc.fileSize ? doc.fileSize.toString() : null,
-    };
+    return this.findOne(companyId, docId);
   }
 
   async updateDocument(companyId: string, docId: string, dto: UpdateCompanyDocDto) {
-    const doc = await this.prisma.companyDocument.findFirst({
-      where: { id: docId, companyId },
-    });
-
-    if (!doc) {
-      throw new NotFoundException('Documento não encontrado');
+    const document = await this.findOne(companyId, docId);
+    
+    // Se docType foi fornecido, formatar no formato {Cliente - Tipo documento}
+    let formattedDocType = dto.docType;
+    if (dto.docType) {
+      const clientName = 'Cliente'; // Para update, usar nome padrão
+      const docTypeLabel = this.getDocTypeLabel(dto.docType);
+      formattedDocType = `${clientName} - ${docTypeLabel}`;
     }
-
-    const updatedDoc = await this.prisma.companyDocument.update({
+    
+    return this.prisma.companyDocument.update({
       where: { id: docId },
       data: {
-        docType: dto.docType,
-        docNumber: dto.docNumber,
-        issuer: dto.issuer,
-        issueDate: dto.issueDate ? new Date(dto.issueDate) : null,
-        expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : null,
-        notes: dto.notes,
-      },
+        ...dto,
+        docType: formattedDocType, // Usar string formatada se fornecida
+        issueDate: dto.issueDate ? new Date(dto.issueDate) : undefined,
+        expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : undefined
+      }
     });
-
-    // Converter BigInt para string para serialização JSON
-    return {
-      ...updatedDoc,
-      fileSize: updatedDoc.fileSize ? updatedDoc.fileSize.toString() : null,
-    };
   }
 
   async deleteDocument(companyId: string, docId: string) {
-    console.log(`[DocumentsService.deleteDocument] Iniciando exclusão - CompanyId: ${companyId}, DocId: ${docId}`);
+    const document = await this.findOne(companyId, docId);
     
-    try {
-      // Verificar se o documento existe
-      const doc = await this.prisma.companyDocument.findFirst({
-        where: { id: docId, companyId },
-        include: { company: true }
-      });
-
-      if (!doc) {
-        console.log(`[DocumentsService.deleteDocument] Documento não encontrado - DocId: ${docId}`);
-        throw new NotFoundException('Documento não encontrado');
+    // Deletar arquivo do Supabase Storage se existir
+    if (document.filePath) {
+      try {
+        await this.storage.deleteObject(document.filePath);
+        console.log(`[DocumentsService.deleteDocument] Arquivo deletado do Supabase Storage: ${document.filePath}`);
+      } catch (error) {
+        console.warn(`[DocumentsService.deleteDocument] Erro ao deletar arquivo do storage: ${error.message}`);
+        // Continuar com a exclusão do banco mesmo se falhar no storage
       }
-
-      console.log(`[DocumentsService.deleteDocument] Documento encontrado:`, {
-        id: doc.id,
-        docType: doc.docType,
-        companyId: doc.companyId,
-        version: doc.version
-      });
-      
-      // Excluir o documento usando deleteMany para evitar problemas de constraint
-      const result = await this.prisma.companyDocument.deleteMany({
-        where: { 
-          id: docId,
-          companyId: companyId 
-        },
-      });
-
-      console.log(`[DocumentsService.deleteDocument] Resultado da exclusão:`, result);
-      
-      if (result.count === 0) {
-        throw new NotFoundException('Documento não foi encontrado para exclusão');
-      }
-
-      console.log(`[DocumentsService.deleteDocument] Documento excluído com sucesso - DocId: ${docId}`);
-      return { success: true, deletedCount: result.count };
-    } catch (error) {
-      console.error(`[DocumentsService.deleteDocument] Erro ao excluir documento - DocId: ${docId}`, error);
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
-      throw new Error(`Erro interno ao excluir documento: ${error.message}`);
     }
+    
+    return this.prisma.companyDocument.delete({
+      where: { id: docId }
+    });
   }
 
   async reuploadDocument(companyId: string, docId: string, dto: UploadDocumentDto, file: Express.Multer.File) {
-    // Buscar documento original
-    const originalDoc = await this.prisma.companyDocument.findFirst({
-      where: { id: docId, companyId },
-    });
-
-    if (!originalDoc) {
-      throw new NotFoundException('Documento não encontrado');
+    try {
+      const document = await this.findOne(companyId, docId);
+      
+      // Deletar arquivo antigo do Supabase Storage se existir
+      if (document.filePath) {
+        try {
+          await this.storage.deleteObject(document.filePath);
+          console.log(`[DocumentsService.reuploadDocument] Arquivo antigo deletado: ${document.filePath}`);
+        } catch (error) {
+          console.warn(`[DocumentsService.reuploadDocument] Erro ao deletar arquivo antigo: ${error.message}`);
+        }
+      }
+      
+      // Formatar docType no formato {Cliente - Tipo documento}
+      const clientName = dto.clientName || 'Cliente';
+      const docTypeLabel = this.getDocTypeLabel(dto.docType);
+      const formattedDocType = `${clientName} - ${docTypeLabel}`;
+      
+      // Gerar nome único para o novo arquivo
+      const timestamp = Date.now();
+      const fileExtension = file.originalname.split('.').pop() || 'pdf';
+      const fileName = `${formattedDocType.replace(/[^a-zA-Z0-9]/g, '_')}_v${document.version + 1}_${timestamp}.${fileExtension}`;
+      const newFilePath = `documents/${companyId}/${fileName}`;
+      
+      // Upload do novo arquivo para Supabase Storage
+      const uploadResult = await this.storage.uploadObject(
+        newFilePath,
+        file.buffer,
+        file.mimetype
+      );
+      
+      console.log(`[DocumentsService.reuploadDocument] Novo arquivo enviado para Supabase Storage: ${uploadResult.path}`);
+      
+      // Atualizar no banco de dados
+      return this.prisma.companyDocument.update({
+        where: { id: docId },
+        data: {
+          docType: formattedDocType,
+          docNumber: dto.docNumber,
+          issuer: dto.issuer,
+          issueDate: dto.issueDate ? new Date(dto.issueDate) : null,
+          expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : null,
+          filePath: uploadResult.path, // Caminho real no Supabase Storage
+          notes: dto.notes,
+          version: document.version + 1
+        }
+      });
+    } catch (error) {
+      console.error('[DocumentsService.reuploadDocument] Erro no reupload:', error);
+      throw new BadRequestException(`Erro ao fazer reupload do arquivo: ${error.message}`);
     }
+  }
 
-    // Validar tamanho do arquivo
-    if (file.size > this.MAX_FILE_SIZE) {
-      throw new BadRequestException('Arquivo muito grande. Máximo 20MB.');
-    }
-
-    // Validar tipo MIME
-    const allowedMimes = ['application/pdf', 'image/jpeg', 'image/png'];
-    if (!allowedMimes.includes(file.mimetype)) {
-      throw new BadRequestException('Tipo de arquivo não permitido. Use PDF, JPEG ou PNG.');
-    }
-
-    // Calcular hash SHA-256
-    const hash = createHash('sha256');
-    hash.update(file.buffer);
-    const sha256Hex = hash.digest('hex');
-
-    // Obter próxima versão
-    const lastVersion = await this.prisma.companyDocument.aggregate({
-      where: { companyId, docType: originalDoc.docType },
-      _max: { version: true },
-    });
-    const version = (lastVersion._max.version ?? 0) + 1;
-
-    // Criar nova versão do documento
-    const document = await this.prisma.companyDocument.create({
-      data: {
-        companyId,
-        docType: originalDoc.docType,
-        clientName: dto.clientName ?? originalDoc.clientName,
-        docNumber: dto.docNumber ?? originalDoc.docNumber,
-        issuer: dto.issuer ?? originalDoc.issuer,
-        issueDate: dto.issueDate ? new Date(dto.issueDate) : originalDoc.issueDate,
-        expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : originalDoc.expiresAt,
-        notes: dto.notes ?? originalDoc.notes,
-        version,
-        fileBytes: file.buffer,
-        mimeType: file.mimetype,
-        fileSize: BigInt(file.size),
-        sha256Hex,
-      },
-    });
-
-    // Converter BigInt para string para serialização JSON
-    return {
-      ...document,
-      fileSize: document.fileSize ? document.fileSize.toString() : null,
+  /**
+   * Converte o tipo de documento para texto legível
+   */
+  private getDocTypeLabel(docType: string): string {
+    const labels: { [key: string]: string } = {
+      'cnpj': 'CNPJ',
+      'certidao': 'Certidão',
+      'procuracao': 'Procuração',
+      'inscricao_estadual': 'Inscrição Estadual',
+      'outro': 'Outros'
     };
+    
+    return labels[docType] || docType;
   }
 }

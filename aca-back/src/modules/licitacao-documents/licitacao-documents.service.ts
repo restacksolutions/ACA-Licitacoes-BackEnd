@@ -1,288 +1,143 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../core/prisma/prisma.service';
-import { CreateLicitacaoDocDto, UploadLicitacaoDocumentDto, LicitacaoDocumentListQueryDto } from './dto/licitacao-doc.dto';
-import { createHash } from 'crypto';
+import { CreateLicitacaoDocumentDto, UpdateLicitacaoDocumentDto, UploadLicitacaoDocumentDto } from './dto/licitacao-document.dto';
+import { LicitacaoDocType, Prisma } from '@prisma/client';
 
 @Injectable()
 export class LicitacaoDocumentsService {
-  private readonly MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
-
   constructor(private prisma: PrismaService) {}
 
-  async streamToBufferAndHash(stream: NodeJS.ReadableStream, maxBytes: number) {
-    const hash = createHash('sha256');
-    const chunks: Buffer[] = [];
-    let total = 0;
-
-    for await (const chunk of stream) {
-      const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-      total += buf.length;
-      if (total > maxBytes) throw new BadRequestException('Arquivo muito grande');
-      hash.update(buf);
-      chunks.push(buf);
-    }
-
-    const buffer = Buffer.concat(chunks);
-    const sha256Hex = hash.digest('hex');
-    return { buffer, size: total, sha256Hex };
-  }
-
-  async list(licitacaoId: string, query: LicitacaoDocumentListQueryDto) {
-    const { docType, page = 1, pageSize = 10 } = query;
-    const skip = (page - 1) * pageSize;
-
-    const where = {
-      licitacaoId,
-      ...(docType && { docType }),
-    };
-
+  async findAll(licitacaoId: string, page: number = 1, limit: number = 10) {
+    const skip = (page - 1) * limit;
+    
     const [documents, total] = await Promise.all([
       this.prisma.licitacaoDocument.findMany({
-        where,
-        select: {
-          id: true,
-          docType: true,
-          issueDate: true,
-          expiresAt: true,
-          filePath: true,
-          mimeType: true,
-          fileSize: true,
-          sha256Hex: true,
-          notes: true,
-          required: true,
-          submitted: true,
-          signed: true,
-          generatedFromTemplate: true,
-          version: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-        orderBy: { createdAt: 'desc' },
+        where: { licitacaoId },
         skip,
-        take: pageSize,
+        take: limit,
+        orderBy: { createdAt: 'desc' }
       }),
-      this.prisma.licitacaoDocument.count({ where }),
+      this.prisma.licitacaoDocument.count({ where: { licitacaoId } })
     ]);
 
-    // Converter BigInt para string em todos os documentos
-    const documentsWithStringFileSize = documents.map(doc => ({
-      ...doc,
-      fileSize: doc.fileSize ? doc.fileSize.toString() : null,
-    }));
-
     return {
-      documents: documentsWithStringFileSize,
+      documents,
       pagination: {
         page,
-        pageSize,
+        limit,
         total,
-        totalPages: Math.ceil(total / pageSize),
-      },
+        pages: Math.ceil(total / limit)
+      }
     };
   }
 
-  create(licitacaoId: string, dto: CreateLicitacaoDocDto) {
-    return this.prisma.licitacaoDocument.create({ data: { licitacaoId, ...dto } });
-  }
-
-  async upload(companyId: string, licitacaoId: string, dto: UploadLicitacaoDocumentDto, file: Express.Multer.File) {
-    // Verificar se a licitação pertence à empresa
-    const licitacao = await this.prisma.licitacao.findFirst({
-      where: { id: licitacaoId, companyId },
-    });
-    
-    if (!licitacao) {
-      throw new BadRequestException('Licitação não encontrada ou não pertence à empresa');
-    }
-
-    // Validar tamanho do arquivo
-    if (file.size > this.MAX_FILE_SIZE) {
-      throw new BadRequestException('Arquivo muito grande. Máximo 20MB.');
-    }
-
-    // Validar tipo MIME
-    const allowedMimes = ['application/pdf', 'image/jpeg', 'image/png'];
-    if (!allowedMimes.includes(file.mimetype)) {
-      throw new BadRequestException('Tipo de arquivo não permitido. Use PDF, JPEG ou PNG.');
-    }
-
-    // Calcular hash SHA-256
-    const hash = createHash('sha256');
-    hash.update(file.buffer);
-    const sha256Hex = hash.digest('hex');
-
-    // Verificar se já existe documento com mesmo hash
-    const existingDoc = await this.prisma.licitacaoDocument.findFirst({
-      where: { licitacaoId, sha256Hex },
+  async findOne(licitacaoId: string, docId: string) {
+    const document = await this.prisma.licitacaoDocument.findFirst({
+      where: { id: docId, licitacaoId }
     });
 
-    if (existingDoc) {
-      throw new BadRequestException('Documento com mesmo conteúdo já existe');
-    }
-
-    // Obter próxima versão
-    const lastVersion = await this.prisma.licitacaoDocument.aggregate({
-      where: { licitacaoId, docType: dto.docType },
-      _max: { version: true },
-    });
-    const version = (lastVersion._max.version ?? 0) + 1;
-
-    // Criar novo documento
-    const document = await this.prisma.licitacaoDocument.create({
-      data: {
-        licitacaoId,
-        docType: dto.docType,
-        issueDate: dto.issueDate ? new Date(dto.issueDate) : null,
-        expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : null,
-        notes: dto.notes,
-        required: dto.required,
-        submitted: dto.submitted,
-        signed: dto.signed,
-        version,
-        fileBytes: file.buffer,
-        mimeType: file.mimetype,
-        fileSize: BigInt(file.size),
-        sha256Hex,
-      },
-    });
-
-    // Converter BigInt para string para serialização JSON
-    return {
-      ...document,
-      fileSize: document.fileSize ? document.fileSize.toString() : null,
-    };
-  }
-
-  async getDocumentContent(licitacaoId: string, docId: string) {
-    const doc = await this.prisma.licitacaoDocument.findFirst({
-      where: { id: docId, licitacaoId },
-      select: { fileBytes: true, mimeType: true, sha256Hex: true },
-    });
-
-    if (!doc?.fileBytes) {
+    if (!document) {
       throw new NotFoundException('Documento não encontrado');
     }
 
+    return document;
+  }
+
+  async create(licitacaoId: string, dto: CreateLicitacaoDocumentDto) {
+    return this.prisma.licitacaoDocument.create({
+      data: {
+        ...dto,
+        licitacaoId,
+        docType: dto.docType as LicitacaoDocType
+      }
+    });
+  }
+
+  async upload(licitacaoId: string, dto: UploadLicitacaoDocumentDto, file: Express.Multer.File) {
+    // Simular upload - em produção, usar Supabase Storage
+    const filePath = `licitacoes/${licitacaoId}/${file.originalname}`;
+    
+    return this.prisma.licitacaoDocument.create({
+      data: {
+        licitacaoId,
+        docType: dto.docType as LicitacaoDocType,
+        required: dto.required,
+        issueDate: dto.issueDate ? new Date(dto.issueDate) : null,
+        expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : null,
+        filePath,
+        notes: dto.notes
+      }
+    });
+  }
+
+  async getDocumentContent(licitacaoId: string, docId: string) {
+    const document = await this.findOne(licitacaoId, docId);
+    
+    if (!document.filePath) {
+      throw new NotFoundException('Arquivo não encontrado');
+    }
+
+    // Em produção, retornar URL assinada do Supabase Storage
     return {
-      buffer: Buffer.from(doc.fileBytes as Buffer),
-      mimeType: doc.mimeType ?? 'application/pdf',
-      sha256Hex: doc.sha256Hex,
+      filePath: document.filePath,
+      downloadUrl: `https://storage.example.com/${document.filePath}`,
+      fileName: document.filePath.split('/').pop()
     };
   }
 
   async getDocumentMeta(licitacaoId: string, docId: string) {
-    const doc = await this.prisma.licitacaoDocument.findFirst({
-      where: { id: docId, licitacaoId },
-      select: {
-        id: true,
-        docType: true,
-        issueDate: true,
-        expiresAt: true,
-        filePath: true,
-        mimeType: true,
-        fileSize: true,
-        sha256Hex: true,
-        notes: true,
-        required: true,
-        submitted: true,
-        signed: true,
-        generatedFromTemplate: true,
-        version: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+    return this.findOne(licitacaoId, docId);
+  }
+
+  async updateDocument(licitacaoId: string, docId: string, dto: UpdateLicitacaoDocumentDto) {
+    const document = await this.findOne(licitacaoId, docId);
+    
+    return this.prisma.licitacaoDocument.update({
+      where: { id: docId },
+      data: {
+        ...dto,
+        docType: dto.docType as LicitacaoDocType,
+        issueDate: dto.issueDate ? new Date(dto.issueDate) : undefined,
+        expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : undefined
+      }
     });
-
-    if (!doc) {
-      throw new NotFoundException('Documento não encontrado');
-    }
-
-    // Converter BigInt para string para serialização JSON
-    return {
-      ...doc,
-      fileSize: doc.fileSize ? doc.fileSize.toString() : null,
-    };
   }
 
   async deleteDocument(licitacaoId: string, docId: string) {
-    const doc = await this.prisma.licitacaoDocument.findFirst({
-      where: { id: docId, licitacaoId },
-    });
-
-    if (!doc) {
-      throw new NotFoundException('Documento não encontrado');
+    const document = await this.findOne(licitacaoId, docId);
+    
+    // Em produção, deletar arquivo do Supabase Storage também
+    if (document.filePath) {
+      console.log(`Deletando arquivo: ${document.filePath}`);
     }
-
+    
     return this.prisma.licitacaoDocument.delete({
-      where: { id: docId },
+      where: { id: docId }
     });
   }
 
   async reuploadDocument(companyId: string, licitacaoId: string, docId: string, dto: UploadLicitacaoDocumentDto, file: Express.Multer.File) {
-    // Verificar se a licitação pertence à empresa
-    const licitacao = await this.prisma.licitacao.findFirst({
-      where: { id: licitacaoId, companyId },
-    });
+    const document = await this.findOne(licitacaoId, docId);
     
-    if (!licitacao) {
-      throw new BadRequestException('Licitação não encontrada ou não pertence à empresa');
+    // Deletar arquivo antigo se existir
+    if (document.filePath) {
+      console.log(`Deletando arquivo antigo: ${document.filePath}`);
     }
-
-    // Buscar documento original
-    const originalDoc = await this.prisma.licitacaoDocument.findFirst({
-      where: { id: docId, licitacaoId },
-    });
-
-    if (!originalDoc) {
-      throw new NotFoundException('Documento não encontrado');
-    }
-
-    // Validar tamanho do arquivo
-    if (file.size > this.MAX_FILE_SIZE) {
-      throw new BadRequestException('Arquivo muito grande. Máximo 20MB.');
-    }
-
-    // Validar tipo MIME
-    const allowedMimes = ['application/pdf', 'image/jpeg', 'image/png'];
-    if (!allowedMimes.includes(file.mimetype)) {
-      throw new BadRequestException('Tipo de arquivo não permitido. Use PDF, JPEG ou PNG.');
-    }
-
-    // Calcular hash SHA-256
-    const hash = createHash('sha256');
-    hash.update(file.buffer);
-    const sha256Hex = hash.digest('hex');
-
-    // Obter próxima versão
-    const lastVersion = await this.prisma.licitacaoDocument.aggregate({
-      where: { licitacaoId, docType: originalDoc.docType },
-      _max: { version: true },
-    });
-    const version = (lastVersion._max.version ?? 0) + 1;
-
-    // Criar nova versão do documento
-    const document = await this.prisma.licitacaoDocument.create({
+    
+    // Upload do novo arquivo
+    const newFilePath = `licitacoes/${licitacaoId}/${file.originalname}`;
+    
+    return this.prisma.licitacaoDocument.update({
+      where: { id: docId },
       data: {
-        licitacaoId,
-        docType: originalDoc.docType,
-        issueDate: dto.issueDate ? new Date(dto.issueDate) : originalDoc.issueDate,
-        expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : originalDoc.expiresAt,
-        notes: dto.notes ?? originalDoc.notes,
-        required: dto.required ?? originalDoc.required,
-        submitted: dto.submitted ?? originalDoc.submitted,
-        signed: dto.signed ?? originalDoc.signed,
-        version,
-        fileBytes: file.buffer,
-        mimeType: file.mimetype,
-        fileSize: BigInt(file.size),
-        sha256Hex,
-      },
+        docType: dto.docType as LicitacaoDocType,
+        required: dto.required,
+        issueDate: dto.issueDate ? new Date(dto.issueDate) : null,
+        expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : null,
+        filePath: newFilePath,
+        notes: dto.notes,
+        version: document.version + 1
+      }
     });
-
-    // Converter BigInt para string para serialização JSON
-    return {
-      ...document,
-      fileSize: document.fileSize ? document.fileSize.toString() : null,
-    };
   }
 }

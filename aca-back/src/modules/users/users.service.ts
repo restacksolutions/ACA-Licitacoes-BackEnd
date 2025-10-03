@@ -9,31 +9,14 @@ export class UsersService {
     console.log('🔍 Buscando usuário:', authUserId);
     
     try {
-      // Busca o usuário com todos os relacionamentos necessários
+      // Busca o usuário com relacionamentos necessários
       const user = await this.prisma.appUser.findUnique({
         where: { authUserId },
         include: {
-          // Empresas onde o usuário é membro (company_members)
           memberships: {
             include: {
               company: true
             }
-          },
-          // Empresas que o usuário criou (companies)
-          companies: true,
-          // Eventos recentes do usuário
-          events: {
-            include: {
-              licitacao: {
-                include: {
-                  company: true
-                }
-              }
-            },
-            orderBy: {
-              eventAt: 'desc'
-            },
-            take: 15
           }
         },
       });
@@ -42,9 +25,8 @@ export class UsersService {
       if (user) {
         console.log('📊 Dados do usuário:', {
           id: user.id,
-          memberships: user.memberships?.length || 0,
-          companies: user.companies?.length || 0,
-          events: user.events?.length || 0
+          email: user.email,
+          fullName: user.fullName
         });
       }
       
@@ -65,20 +47,36 @@ export class UsersService {
       
       console.log('📈 Estatísticas:', { totalMemberships, totalOwnedCompanies, totalEvents });
       
-      // Organiza os dados de forma estruturada e completa
-      const result = {
-        // Dados básicos do usuário
+      // Busca empresas onde o usuário é membro
+      const memberships = await this.prisma.companyMember.findMany({
+        where: { userId: user.id },
+        include: {
+          company: true
+        }
+      });
+      
+      // Busca empresas que o usuário criou
+      const ownedCompanies = await this.prisma.company.findMany({
+        where: { createdById: user.id }
+      });
+      
+      // Busca eventos recentes
+      const recentEvents = await this.prisma.licitacaoEvent.findMany({
+        where: { createdById: user.id },
+        orderBy: { eventAt: 'desc' },
+        take: 15
+      });
+      
+      return {
         id: user.id,
-        authUserId: user.authUserId,
+        authUserId: user.authUserId || "" || '',
         fullName: user.fullName,
         email: user.email,
         createdAt: user.createdAt.toISOString(),
-        
-        // Empresas onde é membro (company_members + companies)
-        memberships: user.memberships.length > 0 ? user.memberships.map(membership => ({
+        memberships: memberships.length > 0 ? memberships.map(membership => ({
           membershipId: membership.id,
           role: membership.role,
-          joinedAt: membership.company.createdAt.toISOString(),
+          joinedAt: membership.createdAt.toISOString(),
           company: {
             id: membership.company.id,
             name: membership.company.name,
@@ -89,12 +87,15 @@ export class UsersService {
             letterheadPath: membership.company.letterheadPath,
             active: membership.company.active,
             createdAt: membership.company.createdAt.toISOString(),
-            createdBy: membership.company.createdById
+            createdBy: membership.company.createdById,
+            creator: {
+              id: user.id,
+              fullName: user.fullName,
+              email: user.email
+            }
           }
-        })) : null,
-        
-        // Empresas que criou (companies)
-        ownedCompanies: user.companies.length > 0 ? user.companies.map(company => ({
+        })) : [],
+        ownedCompanies: ownedCompanies.length > 0 ? ownedCompanies.map(company => ({
           id: company.id,
           name: company.name,
           cnpj: company.cnpj,
@@ -104,60 +105,39 @@ export class UsersService {
           letterheadPath: company.letterheadPath,
           active: company.active,
           createdAt: company.createdAt.toISOString(),
-          createdBy: company.createdById
-        })) : null,
-        
-        // Atividades recentes
-        recentActivity: user.events.length > 0 ? user.events.map(event => ({
+          createdBy: company.createdById,
+          creator: {
+            id: user.id,
+            fullName: user.fullName,
+            email: user.email
+          }
+        })) : [],
+        recentActivity: recentEvents.length > 0 ? recentEvents.map(event => ({
           id: event.id,
           eventAt: event.eventAt.toISOString(),
           description: event.description,
           oldStatus: event.oldStatus,
-          newStatus: event.newStatus,
-          licitacao: event.licitacao ? {
-            id: event.licitacao.id,
-            title: event.licitacao.title,
-            status: event.licitacao.status,
-            orgao: event.licitacao.orgao,
-            modalidade: event.licitacao.modalidade,
-            createdAt: event.licitacao.createdAt.toISOString(),
-            company: event.licitacao.company ? {
-              id: event.licitacao.company.id,
-              name: event.licitacao.company.name
-            } : null
-          } : null
-        })) : null,
-        
-        // Estatísticas completas
+          newStatus: event.newStatus
+        })) : [],
         stats: {
           totalMemberships,
           totalOwnedCompanies,
           totalEvents,
-          activeMemberships: user.memberships.filter(m => m.company.active).length,
-          activeOwnedCompanies: user.companies.filter(c => c.active).length,
-          recentEvents: user.events.length
+          activeMemberships: memberships.filter(m => m.company.active).length,
+          activeOwnedCompanies: ownedCompanies.filter(c => c.active).length,
+          recentEvents: recentEvents.length
         },
-        
-        // Resumo de permissões
         permissions: {
-          canCreateCompanies: true, // Todos os usuários podem criar empresas
-          canManageMembers: user.memberships.some(m => ['owner', 'admin'].includes(m.role)),
-          canManageDocuments: user.memberships.some(m => ['owner', 'admin'].includes(m.role)),
-          canManageBids: user.memberships.some(m => ['owner', 'admin'].includes(m.role))
+          canCreateCompanies: memberships.length === 0, // Só pode criar se não for membro de nenhuma empresa
+          canManageUsers: memberships.some(m => ['owner', 'admin'].includes(m.role)),
+          canManageCompany: memberships.some(m => ['owner', 'admin'].includes(m.role)),
+          canManageMembers: memberships.some(m => ['owner', 'admin'].includes(m.role)),
+          canManageDocuments: memberships.some(m => ['owner', 'admin'].includes(m.role)),
+          canManageBids: memberships.some(m => ['owner', 'admin', 'member'].includes(m.role))
         }
       };
-      
-      console.log('✅ Resultado final:', {
-        memberships: result.memberships,
-        ownedCompanies: result.ownedCompanies,
-        recentActivity: result.recentActivity,
-        stats: result.stats
-      });
-      
-      return result;
-      
     } catch (error) {
-      console.error('❌ Erro na consulta:', error);
+      console.error('❌ Erro ao buscar usuário:', error);
       throw error;
     }
   }

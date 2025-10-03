@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards, NotFoundException, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags, ApiConsumes } from '@nestjs/swagger';
+import { Body, Controller, Get, Param, Patch, Post, Delete, UseGuards, NotFoundException, Query, UploadedFile, UseInterceptors, Res, Header } from '@nestjs/common';
+import type { Response } from 'express';
+import { ApiBearerAuth, ApiTags, ApiConsumes, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../../core/security/jwt-auth.guard';
 import { CompanyGuard } from '../../core/tenancy/company.guard';
@@ -11,7 +12,7 @@ import { CompaniesService } from './companies.service';
 import { CreateCompanyDto, UpdateCompanyDto, CompanyResponseDto } from './dto/company.dto';
 import { UserHelper } from '../../core/security/user-helper.service';
 import { DocumentsService } from '../documents/documents.service';
-import { DocumentListQueryDto, UploadDocumentDto } from '../documents/dto/doc.dto';
+import { DocumentListQueryDto, UploadDocumentDto, UpdateCompanyDocDto } from '../documents/dto/document.dto';
 
 @ApiTags('Companies')
 @ApiBearerAuth('bearer')
@@ -64,7 +65,7 @@ export class CompaniesController {
   @UseGuards(CompanyGuard)
   @Get(':companyId/documents')
   async getDocuments(@Param('companyId') companyId: string, @Query() query: DocumentListQueryDto) {
-    return this.documentsService.list(companyId, query);
+    return this.documentsService.findAll(companyId, query.page, query.limit, query.search);
   }
 
   @UseGuards(CompanyGuard)
@@ -96,5 +97,60 @@ export class CompaniesController {
       throw new Error('Arquivo é obrigatório');
     }
     return this.documentsService.reuploadDocument(companyId, documentId, dto, file);
+  }
+
+  @UseGuards(CompanyGuard)
+  @Get(':companyId/documents/:documentId/content')
+  @ApiOperation({ summary: 'Download do conteúdo do documento' })
+  @ApiResponse({ status: 200, description: 'Conteúdo do documento' })
+  @Header('Cache-Control', 'public, max-age=3600')
+  async getDocumentContent(
+    @Param('companyId') companyId: string,
+    @Param('documentId') documentId: string,
+    @Res() res: Response,
+  ) {
+    const { fileName, content, mimeType } = await this.documentsService.getDocumentContent(companyId, documentId);
+    
+    res.set({
+      'Content-Type': mimeType || 'application/pdf',
+      'Content-Disposition': `attachment; filename="${fileName}"`,
+      'Content-Length': content.length.toString()
+    });
+    
+    res.send(content);
+  }
+
+  @UseGuards(CompanyGuard)
+  @Get(':companyId/documents/:documentId/meta')
+  @ApiOperation({ summary: 'Obter metadados do documento' })
+  @ApiResponse({ status: 200, description: 'Metadados do documento' })
+  async getDocumentMeta(
+    @Param('companyId') companyId: string,
+    @Param('documentId') documentId: string,
+  ) {
+    return this.documentsService.getDocumentMeta(companyId, documentId);
+  }
+
+  @UseGuards(CompanyGuard)
+  @Patch(':companyId/documents/:documentId')
+  @ApiOperation({ summary: 'Atualizar documento' })
+  @ApiResponse({ status: 200, description: 'Documento atualizado' })
+  async updateDocument(
+    @Param('companyId') companyId: string,
+    @Param('documentId') documentId: string,
+    @Body() dto: UpdateCompanyDocDto,
+  ) {
+    return this.documentsService.updateDocument(companyId, documentId, dto);
+  }
+
+  @UseGuards(CompanyGuard)
+  @Delete(':companyId/documents/:documentId')
+  @ApiOperation({ summary: 'Excluir documento' })
+  @ApiResponse({ status: 200, description: 'Documento excluído' })
+  async deleteDocument(
+    @Param('companyId') companyId: string,
+    @Param('documentId') documentId: string,
+  ) {
+    return this.documentsService.deleteDocument(companyId, documentId);
   }
 }

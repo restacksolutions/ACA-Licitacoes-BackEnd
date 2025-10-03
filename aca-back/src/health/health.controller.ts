@@ -6,7 +6,9 @@ import { Public } from '../core/security/public.decorator';
 @ApiTags('Health')
 @Controller('health')
 export class HealthController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService
+  ) {}
 
   @Get()
   @Public()
@@ -24,24 +26,15 @@ export class HealthController {
   @Get('database')
   @Public()
   @ApiOperation({ summary: 'Teste de conexão com o banco de dados' })
-  @ApiResponse({ status: 200, description: 'Banco conectado com sucesso' })
-  @ApiResponse({ status: 500, description: 'Erro na conexão com o banco' })
+  @ApiResponse({ status: 200, description: 'Banco de dados conectado' })
   async getDatabaseHealth() {
     try {
-      // Testa a conexão executando uma query simples
-      await this.prisma.$queryRaw`SELECT 1 as test`;
+      // Testa conexão com uma query simples
+      await this.prisma.$queryRaw`SELECT 1`;
       
-      // Verifica se as tabelas existem
-      const tables = await this.prisma.$queryRaw`
-        SELECT name FROM sqlite_master 
-        WHERE type='table' AND name NOT LIKE 'sqlite_%'
-        ORDER BY name
-      `;
-
       return {
         status: 'ok',
         database: 'connected',
-        tables: tables,
         timestamp: new Date().toISOString(),
       };
     } catch (error) {
@@ -75,7 +68,7 @@ export class HealthController {
         status: 'ok',
         prisma: {
           version: '6.16.2',
-          database: 'SQLite',
+          database: 'SQLite (Local)',
           tables: {
             appUsers: counts[0],
             companies: counts[1],
@@ -92,6 +85,32 @@ export class HealthController {
       return {
         status: 'error',
         prisma: 'error',
+        error: error.message,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  @Get('ready')
+  @Public()
+  @ApiOperation({ summary: 'Health check completo' })
+  @ApiResponse({ status: 200, description: 'Sistema pronto' })
+  async getReady() {
+    try {
+      // Testa banco de dados
+      await this.prisma.$queryRaw`SELECT 1`;
+      
+      return {
+        status: 'ready',
+        database: 'connected',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        environment: process.env.NODE_ENV || 'development',
+      };
+    } catch (error) {
+      return {
+        status: 'not ready',
+        database: 'disconnected',
         error: error.message,
         timestamp: new Date().toISOString(),
       };

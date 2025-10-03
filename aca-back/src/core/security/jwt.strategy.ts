@@ -10,7 +10,7 @@ export class JwtStrategy {
     private readonly config: ConfigService,
     private supabaseAuth: SupabaseAuthService,
   ) {
-    const jwksUrl = this.config.get<string>('SUPABASE_JWKS_URL') || 'https://gpoerydbnxvtlifmwtyb.supabase.co/auth/v1/keys';
+    const jwksUrl = this.config.get<string>('SUPABASE_JWKS_URL') || 'https://placeholder.supabase.co/auth/v1/keys';
     this.jwks = createRemoteJWKSet(new URL(jwksUrl));
   }
   

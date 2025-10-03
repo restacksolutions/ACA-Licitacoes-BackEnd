@@ -70,8 +70,7 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, document);
 
-  const prisma = app.get(PrismaService);
-  await prisma.enableShutdownHooks(app);
+  // Prisma shutdown hooks são gerenciados automaticamente
 
   await app.listen(process.env.PORT || 3000);
 }

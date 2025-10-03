@@ -31,6 +31,6 @@ export class UsersController {
     description: 'Usuário não encontrado' 
   })
   async me(@CurrentUser() user: { authUserId: string }): Promise<UserMeResponseDto> {
-    return this.svc.me(user.authUserId);
+    return this.svc.me(user.authUserId || '');
   }
 }

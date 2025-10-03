@@ -9,12 +9,13 @@ export class SupabaseAuthService {
 
   constructor(private configService: ConfigService) {
     const supabaseUrl = this.configService.get<string>('SUPABASE_PROJECT_URL') || 'https://placeholder.supabase.co';
-    const supabaseKey = this.configService.get<string>('SUPABASE_ANON_KEY') || 'placeholder-key';
+    const serviceRoleKey = this.configService.get<string>('SUPABASE_SERVICE_ROLE') || 'placeholder-key';
     
-    this.isDevelopment = supabaseUrl.includes('placeholder') || supabaseKey === 'placeholder-key';
+    this.isDevelopment = supabaseUrl.includes('placeholder') || supabaseUrl.includes('exemplo') || serviceRoleKey === 'placeholder-key' || serviceRoleKey.includes('exemplo');
     
     if (!this.isDevelopment) {
-      this.supabase = createClient(supabaseUrl, supabaseKey);
+      // Usar SERVICE_ROLE no backend para operações administrativas
+      this.supabase = createClient(supabaseUrl, serviceRoleKey);
     }
   }
 
@@ -131,6 +132,27 @@ export class SupabaseAuthService {
         throw error;
       }
       throw new UnauthorizedException('Erro na verificação do token');
+    }
+  }
+
+  async getUserByAccessToken(jwt: string) {
+    if (this.isDevelopment) {
+      const mockData = this.parseMockToken(jwt);
+      if (!mockData) {
+        throw new UnauthorizedException('Token inválido');
+      }
+      return {
+        id: mockData.user_id,
+        email: mockData.email,
+      };
+    }
+
+    try {
+      const { data, error } = await this.supabase.auth.getUser(jwt);
+      if (error) throw error;
+      return data.user;
+    } catch (error) {
+      throw new UnauthorizedException('Erro ao obter usuário');
     }
   }
 

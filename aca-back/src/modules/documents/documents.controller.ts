@@ -4,7 +4,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import { JwtAuthGuard } from '../../core/security/jwt-auth.guard';
 import { ActiveCompany } from '../../core/tenancy/active-company.decorator';
-import { CreateCompanyDocDto, UpdateCompanyDocDto, CompanyDocResponseDto, UploadDocumentDto, DocumentListQueryDto } from './dto/doc.dto';
+import { CreateCompanyDocDto, UpdateCompanyDocDto, UploadDocumentDto, DocumentListQueryDto } from './dto/document.dto';
 import { DocumentsService } from './documents.service';
 
 @ApiTags('Company Documents')
@@ -18,7 +18,7 @@ export class DocumentsController {
   @ApiOperation({ summary: 'Listar documentos da empresa' })
   @ApiResponse({ status: 200, description: 'Lista de documentos com paginação' })
   list(@ActiveCompany() company: any, @Query() query: DocumentListQueryDto) {
-    return this.svc.list(company.id, query);
+    return this.svc.findAll(company.id, query.page, query.limit, query.search);
   }
 
   @Post()
@@ -52,6 +52,12 @@ export class DocumentsController {
         console.log(`[DocumentsController.upload] Arquivo não fornecido`);
         throw new Error('Arquivo é obrigatório');
       }
+
+      // Validar se docType é válido
+      const validDocTypes = ['cnpj', 'certidao', 'procuracao', 'inscricao_estadual', 'outro'];
+      if (!validDocTypes.includes(dto.docType)) {
+        throw new Error(`docType deve ser um dos seguintes valores: ${validDocTypes.join(', ')}`);
+      }
       
       const result = await this.svc.upload(company.id, dto, file);
       console.log(`[DocumentsController.upload] Upload realizado com sucesso`);
@@ -71,15 +77,15 @@ export class DocumentsController {
     @Param('id') docId: string,
     @Res() res: Response,
   ) {
-    const { buffer, mimeType, sha256Hex } = await this.svc.getDocumentContent(company.id, docId);
+    const { fileName, content, mimeType } = await this.svc.getDocumentContent(company.id, docId);
     
     res.set({
-      'Content-Type': mimeType,
-      'ETag': sha256Hex,
-      'Content-Length': buffer.length.toString(),
+      'Content-Type': mimeType || 'application/pdf',
+      'Content-Disposition': `attachment; filename="${fileName}"`,
+      'Content-Length': content.length.toString()
     });
     
-    res.send(buffer);
+    res.send(content);
   }
 
   @Get(':id/meta')

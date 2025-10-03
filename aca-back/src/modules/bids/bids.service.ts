@@ -11,7 +11,12 @@ export class BidsService {
   }
 
   create(companyId: string, dto: CreateBidDto) {
-    return this.prisma.licitacao.create({ data: { companyId, ...dto } });
+    const data = {
+      ...dto,
+      companyId,
+      saleValue: dto.saleValue ? parseFloat(dto.saleValue) : null
+    };
+    return this.prisma.licitacao.create({ data });
   }
 
   async get(companyId: string, bidId: string) {
@@ -21,7 +26,11 @@ export class BidsService {
   }
 
   update(companyId: string, bidId: string, dto: Partial<CreateBidDto>) {
-    return this.prisma.licitacao.update({ where: { id: bidId }, data: dto });
+    const data = {
+      ...dto,
+      saleValue: dto.saleValue ? parseFloat(dto.saleValue) : undefined
+    };
+    return this.prisma.licitacao.update({ where: { id: bidId }, data });
   }
 
   remove(bidId: string) {

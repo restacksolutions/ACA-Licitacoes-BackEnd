@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -39,10 +39,11 @@ enum LicitacaoDocType {
 }
 
 model AppUser {
-  id           String   @id @default(uuid())
+  id           String   @id @default(cuid())
+  authUserId   String?  @map("auth_user_id") @unique
   fullName     String?
   email        String   @unique
-  passwordHash String
+  passwordHash String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -52,10 +53,11 @@ model AppUser {
   events           LicitacaoEvent[]
 
   @@map("app_users")
+  @@index([createdAt])
 }
 
 model Company {
-  id             String   @id @default(uuid())
+  id             String   @id @default(cuid())
   name           String
   cnpj           String?  @unique
   phone          String?
@@ -67,21 +69,19 @@ model Company {
   updatedAt      DateTime @updatedAt
 
   // Relations
-  createdById String   @map("created_by")
-  createdBy   AppUser  @relation("CompanyCreatedBy", fields: [createdById], references: [id])
+  createdById String   @map("created_by_id")
+  createdBy   AppUser  @relation("CompanyCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   members     CompanyMember[]
   documents   CompanyDocument[]
   licitacoes Licitacao[]
 
-  // Unique constraint: one user can only create/own one company
-  // To disable this constraint and allow users to create multiple companies,
-  // comment out the line below and run: npx prisma migrate dev
-  @@unique([createdById])
   @@map("companies")
+  @@index([createdById])
+  @@index([createdAt])
 }
 
 model CompanyMember {
-  id        String      @id @default(uuid())
+  id        String      @id @default(cuid())
   companyId String      @map("company_id")
   userId    String      @map("user_id")
   role      RoleCompany @default(member)
@@ -94,14 +94,13 @@ model CompanyMember {
 
   // Unique constraint: one user can only be member of one company
   @@unique([companyId, userId])
-  // Optional: force 1 user = 1 company (exclusive)
-  // To enable this constraint, uncomment the line below and run: npx prisma migrate dev
-  // @@unique([userId])
   @@map("company_members")
+  @@index([role])
+  @@index([createdAt])
 }
 
 model CompanyDocument {
-  id          String        @id @default(uuid())
+  id          String        @id @default(cuid())
   companyId   String        @map("company_id")
   docType     CompanyDocType
   docNumber   String?
@@ -118,33 +117,39 @@ model CompanyDocument {
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@map("company_documents")
+  @@unique([companyId, docType, version])
+  @@index([companyId, docType])
+  @@index([expiresAt])
 }
 
 model Licitacao {
-  id                  String         @id @default(uuid())
-  companyId           String         @map("company_id")
-  title               String
-  orgao               String?
-  modalidade          String?
-  editalUrl           String?
-  sessionAt           DateTime?
-  submissionDeadline  DateTime?
-  status              LicitacaoStatus @default(draft)
-  saleValue           Decimal?
-  notes               String?
-  createdAt           DateTime       @default(now())
-  updatedAt           DateTime       @updatedAt
+  id                 String          @id @default(cuid())
+  companyId          String          @map("company_id")
+  title              String
+  orgao              String?
+  modalidade         String?
+  editalUrl          String?
+  sessionAt          DateTime?
+  submissionDeadline DateTime?
+  status             LicitacaoStatus @default(draft)
+  saleValue          Float?
+  notes              String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
 
   // Relations
-  company   Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company   Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
   documents LicitacaoDocument[]
   events    LicitacaoEvent[]
 
   @@map("licitacoes")
+  @@index([companyId, createdAt])
+  @@index([status])
+  @@index([submissionDeadline])
 }
 
 model LicitacaoDocument {
-  id                    String            @id @default(uuid())
+  id                    String            @id @default(cuid())
   licitacaoId           String            @map("licitacao_id")
   docType               LicitacaoDocType
   required              Boolean           @default(true)
@@ -164,20 +169,25 @@ model LicitacaoDocument {
   licitacao Licitacao @relation(fields: [licitacaoId], references: [id], onDelete: Cascade)
 
   @@map("licitacao_documents")
+  @@unique([licitacaoId, docType, version])
+  @@index([licitacaoId, docType])
+  @@index([expiresAt])
 }
 
 model LicitacaoEvent {
-  id          String          @id @default(uuid())
+  id          String          @id @default(cuid())
   licitacaoId String          @map("licitacao_id")
   eventAt     DateTime        @default(now())
   oldStatus   LicitacaoStatus?
   newStatus   LicitacaoStatus?
   description String?
-  createdById String?        @map("created_by")
+  createdById String?         @map("created_by_id")
 
   // Relations
   licitacao Licitacao @relation(fields: [licitacaoId], references: [id], onDelete: Cascade)
-  createdBy AppUser?   @relation(fields: [createdById], references: [id])
+  createdBy AppUser?  @relation(fields: [createdById], references: [id], onDelete: SetNull)
 
   @@map("licitacao_events")
+  @@index([licitacaoId, eventAt])
+  @@index([newStatus])
 }
