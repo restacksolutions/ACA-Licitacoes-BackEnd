@@ -50,7 +50,7 @@ model CompanyMember {
   id        String      @id @default(cuid())
   companyId String      @map("company_id")
   userId    String      @map("user_id")
-  role      RoleCompany @default(member)
+  role      RoleCompany @default(MEMBER)
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
   company   Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -65,6 +65,8 @@ model CompanyMember {
 model CompanyDocument {
   id        String   @id @default(cuid())
   companyId String   @map("company_id")
+  name      String
+  type      String
   docType   String   // Mudado de enum para string para permitir formato "Cliente - Tipo"
   docNumber String?
   issuer    String?
@@ -92,7 +94,7 @@ model Licitacao {
   editalUrl          String?
   sessionAt          DateTime?
   submissionDeadline DateTime?
-  status             LicitacaoStatus     @default(draft)
+  status             LicitacaoStatus     @default(DRAFT)
   saleValue          Decimal?            @db.Decimal(12, 2)
   notes              String?
   createdAt          DateTime            @default(now())
@@ -110,6 +112,8 @@ model Licitacao {
 model LicitacaoDocument {
   id                    String           @id @default(cuid())
   licitacaoId           String           @map("licitacao_id")
+  name                  String
+  type                  String
   docType               LicitacaoDocType
   required              Boolean          @default(true)
   submitted             Boolean          @default(false)
@@ -134,7 +138,8 @@ model LicitacaoDocument {
 model LicitacaoEvent {
   id          String           @id @default(cuid())
   licitacaoId String           @map("licitacao_id")
-  eventAt     DateTime         @default(now())
+  title       String
+  eventDate   DateTime         @default(now())
   oldStatus   LicitacaoStatus?
   newStatus   LicitacaoStatus?
   description String?
@@ -142,36 +147,38 @@ model LicitacaoEvent {
   createdBy   AppUser?         @relation(fields: [createdById], references: [id])
   licitacao   Licitacao        @relation(fields: [licitacaoId], references: [id], onDelete: Cascade)
 
-  @@index([licitacaoId, eventAt])
+  @@index([licitacaoId, eventDate])
   @@index([newStatus])
   @@map("licitacao_events")
 }
 
 enum RoleCompany {
-  owner
-  admin
-  member
+  OWNER
+  ADMIN
+  MEMBER
 }
 
 enum LicitacaoStatus {
-  draft
-  open
-  closed
-  cancelled
-  awarded
+  DRAFT
+  OPEN
+  CLOSED
+  CANCELLED
+  AWARDED
 }
 
 enum CompanyDocType {
-  cnpj
-  certidao
-  procuracao
-  inscricao_estadual
-  outro
+  CNPJ
+  CERTIDAO
+  PROCURACAO
+  INSCRICAO_ESTADUAL
+  OUTRO
 }
 
 enum LicitacaoDocType {
-  proposta
-  habilitacao
-  contrato
-  outro
+  EDITAL
+  ANEXO
+  ADITIVO
+  OUTROS
+  PROPOSTA
+  HABILITACAO
 }

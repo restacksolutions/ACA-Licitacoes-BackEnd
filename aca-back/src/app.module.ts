@@ -11,12 +11,14 @@ import { CompanyContextMiddleware } from './core/tenancy/company-context.middlew
 import { SupabaseStorage } from './adapters/storage/supabase.storage';
 
 import { HealthModule } from './health/health.module';
-import { AuthModule } from './modules/auth/auth.module';
+// import { AuthModule } from './modules/auth/auth.module';
+import { AuthNewModule } from './modules/auth/auth-new.module';
 import { UsersModule } from './modules/users/users.module';
 import { CompaniesModule } from './modules/companies/companies.module';
 import { MembersModule } from './modules/members/members.module';
 import { DocumentsModule } from './modules/documents/documents.module';
 import { LicitacaoDocumentsModule } from './modules/licitacao-documents/licitacao-documents.module';
+import { LicitacaoEventsModule } from './modules/licitacao-events/licitacao-events.module';
 import { BidsModule } from './modules/bids/bids.module';
 import { BidDocsModule } from './modules/bid-docs/bid-docs.module';
 import { WorkflowModule } from './modules/workflow/workflow.module';
@@ -29,12 +31,14 @@ import { AuditModule } from './modules/audit/audit.module';
     LoggerModule,
     PrismaModule,
     HealthModule,
-    AuthModule,
+    // AuthModule,
+    AuthNewModule,
     UsersModule,
     CompaniesModule,
     MembersModule,
     DocumentsModule,
     LicitacaoDocumentsModule,
+    LicitacaoEventsModule,
     BidsModule,
     BidDocsModule,
     WorkflowModule,

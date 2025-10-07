@@ -2,11 +2,11 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsNumberString, IsOptional, IsString, IsDateString } from 'class-validator';
 
 export enum LicitacaoStatus {
-  draft = 'draft',
-  open = 'open',
-  closed = 'closed',
-  cancelled = 'cancelled',
-  awarded = 'awarded'
+  DRAFT = 'DRAFT',
+  OPEN = 'OPEN',
+  CLOSED = 'CLOSED',
+  CANCELLED = 'CANCELLED',
+  AWARDED = 'AWARDED'
 }
 
 export class CreateBidDto {
@@ -39,7 +39,7 @@ export class CreateBidDto {
   @IsOptional()
   submissionDeadline?: string;
 
-  @ApiPropertyOptional({ enum: LicitacaoStatus, example: LicitacaoStatus.draft })
+  @ApiPropertyOptional({ enum: LicitacaoStatus, example: LicitacaoStatus.DRAFT })
   @IsEnum(LicitacaoStatus)
   @IsOptional()
   status?: LicitacaoStatus;
@@ -86,7 +86,7 @@ export class UpdateBidDto {
   @IsOptional()
   submissionDeadline?: string;
 
-  @ApiPropertyOptional({ enum: LicitacaoStatus, example: LicitacaoStatus.open })
+  @ApiPropertyOptional({ enum: LicitacaoStatus, example: LicitacaoStatus.OPEN })
   @IsEnum(LicitacaoStatus)
   @IsOptional()
   status?: LicitacaoStatus;
@@ -124,7 +124,7 @@ export class BidResponseDto {
   @ApiPropertyOptional({ example: '2025-10-10T18:00:00.000Z' })
   submissionDeadline?: string;
 
-  @ApiProperty({ enum: LicitacaoStatus, example: LicitacaoStatus.draft })
+  @ApiProperty({ enum: LicitacaoStatus, example: LicitacaoStatus.DRAFT })
   status!: LicitacaoStatus;
 
   @ApiPropertyOptional({ example: '150000.50' })

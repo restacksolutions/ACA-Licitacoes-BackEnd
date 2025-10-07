@@ -4,8 +4,8 @@ export class UserMembershipDto {
   @ApiProperty({ example: '123e4567-e89b-12d3-a456-426614174000' })
   membershipId!: string;
 
-  @ApiProperty({ enum: ['owner', 'admin', 'member'], example: 'member' })
-  role!: 'owner' | 'admin' | 'member';
+  @ApiProperty({ enum: ['OWNER', 'ADMIN', 'MEMBER'], example: 'MEMBER' })
+  role!: 'OWNER' | 'ADMIN' | 'MEMBER';
 
   @ApiProperty({ example: '2025-09-22T20:30:00.000Z' })
   joinedAt!: string;

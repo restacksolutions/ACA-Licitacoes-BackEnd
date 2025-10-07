@@ -17,11 +17,11 @@ export class MembersService {
     if (!user) throw new NotFoundException('Usuário não encontrado (convite pendente não implementado)');
     const exists = await this.prisma.companyMember.findFirst({ where: { companyId, userId: user.id }});
     if (exists) throw new BadRequestException('Já é membro');
-    return this.prisma.companyMember.create({ data: { companyId, userId: user.id, role } });
+    return this.prisma.companyMember.create({ data: { companyId, userId: user.id, role: role as any } });
   }
 
   async updateRole(memberId: string, role: 'owner'|'admin'|'member') {
-    return this.prisma.companyMember.update({ where: { id: memberId }, data: { role } });
+    return this.prisma.companyMember.update({ where: { id: memberId }, data: { role: role as any } });
   }
 
   async remove(memberId: string) {

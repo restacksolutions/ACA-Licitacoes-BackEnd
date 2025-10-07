@@ -66,9 +66,15 @@ export class DocumentsService {
     
     return this.prisma.companyDocument.create({
       data: {
-        ...dto,
-        docType: formattedDocType, // Usar string formatada
-        companyId
+        name: dto.docType,
+        type: dto.docType,
+        docType: dto.docType as any, // Usar enum do DTO
+        companyId,
+        docNumber: dto.docNumber,
+        issuer: dto.issuer,
+        issueDate: dto.issueDate ? new Date(dto.issueDate) : null,
+        expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : null,
+        notes: dto.notes,
       }
     });
   }
@@ -98,8 +104,10 @@ export class DocumentsService {
       // Salvar no banco de dados
       return this.prisma.companyDocument.create({
         data: {
+          name: dto.docType,
+          type: dto.docType,
           companyId,
-          docType: formattedDocType,
+          docType: dto.docType as any,
           docNumber: dto.docNumber,
           issuer: dto.issuer,
           issueDate: dto.issueDate ? new Date(dto.issueDate) : null,
@@ -186,7 +194,7 @@ export class DocumentsService {
       where: { id: docId },
       data: {
         ...dto,
-        docType: formattedDocType, // Usar string formatada se fornecida
+        docType: dto.docType as any, // Usar enum do DTO
         issueDate: dto.issueDate ? new Date(dto.issueDate) : undefined,
         expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : undefined
       }
@@ -250,7 +258,7 @@ export class DocumentsService {
       return this.prisma.companyDocument.update({
         where: { id: docId },
         data: {
-          docType: formattedDocType,
+          docType: dto.docType as any,
           docNumber: dto.docNumber,
           issuer: dto.issuer,
           issueDate: dto.issueDate ? new Date(dto.issueDate) : null,

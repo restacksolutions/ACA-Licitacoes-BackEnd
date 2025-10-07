@@ -3,11 +3,11 @@ import { IsEnum, IsNumberString, IsOptional, IsString, IsDateString, IsNumber } 
 import { Transform, Type } from 'class-transformer';
 
 export enum LicitacaoStatus {
-  draft = 'draft',
-  open = 'open',
-  closed = 'closed',
-  cancelled = 'cancelled',
-  awarded = 'awarded'
+  DRAFT = 'DRAFT',
+  OPEN = 'OPEN',
+  CLOSED = 'CLOSED',
+  CANCELLED = 'CANCELLED',
+  AWARDED = 'AWARDED'
 }
 
 export class CreateLicitacaoDto {
@@ -40,7 +40,7 @@ export class CreateLicitacaoDto {
   @IsOptional()
   submissionDeadline?: string;
 
-  @ApiPropertyOptional({ enum: LicitacaoStatus, example: LicitacaoStatus.draft })
+  @ApiPropertyOptional({ enum: LicitacaoStatus, example: LicitacaoStatus.DRAFT })
   @IsEnum(LicitacaoStatus)
   @IsOptional()
   status?: LicitacaoStatus;
@@ -87,7 +87,7 @@ export class UpdateLicitacaoDto {
   @IsOptional()
   submissionDeadline?: string;
 
-  @ApiPropertyOptional({ enum: LicitacaoStatus, example: LicitacaoStatus.open })
+  @ApiPropertyOptional({ enum: LicitacaoStatus, example: LicitacaoStatus.OPEN })
   @IsEnum(LicitacaoStatus)
   @IsOptional()
   status?: LicitacaoStatus;
@@ -125,7 +125,7 @@ export class LicitacaoResponseDto {
   @ApiPropertyOptional({ example: '2025-10-10T18:00:00.000Z' })
   submissionDeadline?: string;
 
-  @ApiProperty({ enum: LicitacaoStatus, example: LicitacaoStatus.draft })
+  @ApiProperty({ enum: LicitacaoStatus, example: LicitacaoStatus.DRAFT })
   status!: LicitacaoStatus;
 
   @ApiPropertyOptional({ example: '150000.50' })
@@ -144,7 +144,7 @@ export class LicitacaoResponseDto {
 export class LicitacaoListQueryDto {
   @ApiPropertyOptional({ 
     enum: LicitacaoStatus,
-    example: LicitacaoStatus.draft,
+    example: LicitacaoStatus.DRAFT,
     description: 'Filtrar por status da licitação'
   })
   @IsEnum(LicitacaoStatus)

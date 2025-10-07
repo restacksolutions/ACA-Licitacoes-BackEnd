@@ -46,9 +46,14 @@ export class LicitacaoDocumentsService {
   async create(licitacaoId: string, dto: CreateLicitacaoDocumentDto) {
     return this.prisma.licitacaoDocument.create({
       data: {
-        ...dto,
         licitacaoId,
-        docType: dto.docType as LicitacaoDocType
+        name: dto.docType,
+        type: dto.docType,
+        docType: dto.docType as LicitacaoDocType,
+        required: dto.required,
+        issueDate: dto.issueDate ? new Date(dto.issueDate) : null,
+        expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : null,
+        notes: dto.notes,
       }
     });
   }
@@ -60,6 +65,8 @@ export class LicitacaoDocumentsService {
     return this.prisma.licitacaoDocument.create({
       data: {
         licitacaoId,
+        name: dto.docType,
+        type: dto.docType,
         docType: dto.docType as LicitacaoDocType,
         required: dto.required,
         issueDate: dto.issueDate ? new Date(dto.issueDate) : null,

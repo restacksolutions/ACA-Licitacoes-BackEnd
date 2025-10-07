@@ -76,7 +76,7 @@ export class AuthService {
           data: {
             companyId: company.id,
             userId: user!.id,
-            role: 'owner',
+            role: 'OWNER',
           },
         });
       });
@@ -156,7 +156,7 @@ export class AuthService {
         data: {
           companyId: company.id,
           userId: user.id,
-          role: 'owner',
+          role: 'OWNER',
         },
       });
 
@@ -198,7 +198,7 @@ export class AuthService {
           data: {
             companyId: company.id,
             userId: user.id,
-            role: 'owner',
+            role: 'OWNER',
           },
         });
       });

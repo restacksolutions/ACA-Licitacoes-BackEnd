@@ -5,6 +5,8 @@ import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { PrismaService } from './core/prisma/prisma.service';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { ResponseInterceptor } from './core/interceptors/response.interceptor';
+import { ErrorInterceptor } from './core/interceptors/error.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
@@ -60,7 +62,11 @@ async function bootstrap() {
   });
 
   // Global prefix
-  app.setGlobalPrefix('v1');
+  app.setGlobalPrefix('api/v1');
+
+  // Global interceptors
+  app.useGlobalInterceptors(new ResponseInterceptor());
+  app.useGlobalInterceptors(new ErrorInterceptor());
 
   const config = new DocumentBuilder()
     .setTitle(process.env.SWAGGER_TITLE ?? 'ACA Licitações API')

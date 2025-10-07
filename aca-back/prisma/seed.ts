@@ -23,7 +23,7 @@ async function main() {
       cnpj: '12.345.678/0001-90',
       createdById: user.id,
       members: {
-        create: [{ userId: user.id, role: RoleCompany.owner }],
+        create: [{ userId: user.id, role: 'OWNER' }],
       },
     },
   });
@@ -36,17 +36,21 @@ async function main() {
       title: 'Pregão Eletrônico 001/2025',
       orgao: 'Prefeitura X',
       modalidade: 'Pregão',
-      status: LicitacaoStatus.draft,
+      status: 'DRAFT',
       documents: {
         create: [
           {
-            docType: LicitacaoDocType.proposta,
+            name: 'Proposta Técnica e Comercial',
+            type: 'PROPOSTA',
+            docType: 'PROPOSTA',
             required: true,
             version: 1,
             filePath: 'docs/licitacoes/edital-001-v1.pdf',
           },
           {
-            docType: LicitacaoDocType.habilitacao,
+            name: 'Documentos de Habilitação',
+            type: 'HABILITACAO',
+            docType: 'HABILITACAO',
             required: false,
             version: 1,
             filePath: 'docs/licitacoes/tr-001-v1.pdf',
@@ -62,6 +66,8 @@ async function main() {
   await prisma.companyDocument.create({
     data: {
       companyId: company.id,
+      name: 'CNPJ',
+      type: 'CNPJ',
       docType: 'cnpj',
       docNumber: '12.345.678/0001-90',
       issuer: 'Receita Federal',

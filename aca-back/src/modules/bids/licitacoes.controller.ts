@@ -7,13 +7,18 @@ import { RolesGuard } from '../../core/security/roles.guard';
 import { Roles } from '../../core/security/roles.decorator';
 import { LicitacoesService } from './licitacoes.service';
 import { CreateLicitacaoDto, UpdateLicitacaoDto, LicitacaoResponseDto, LicitacaoListQueryDto, AnalisarEditalDto } from './dto/licitacao.dto';
+import { LicitacaoEventsService } from '../licitacao-events/licitacao-events.service';
+import { ChangeStatusDto } from '../licitacao-events/dto/licitacao-event.dto';
 
 @ApiTags('Licitações')
 @ApiBearerAuth('bearer')
 @UseGuards(JwtAuthGuard, ActiveCompanyGuard)
 @Controller('licitacoes')
 export class LicitacoesController {
-  constructor(private readonly svc: LicitacoesService) {}
+  constructor(
+    private readonly svc: LicitacoesService,
+    private readonly eventsSvc: LicitacaoEventsService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Listar licitações da empresa ativa' })
@@ -85,5 +90,18 @@ export class LicitacoesController {
   @ApiResponse({ status: 200, description: 'Painel de conformidade com percentual de cobertura' })
   getConformidade(@ActiveCompany() company: any, @Param('id') id: string) {
     return this.svc.getConformidade(company.id, id);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles('owner', 'admin')
+  @Patch(':id/status')
+  @ApiOperation({ summary: 'Alterar status da licitação' })
+  @ApiResponse({ status: 200, description: 'Status alterado com sucesso' })
+  changeStatus(
+    @ActiveCompany() company: any,
+    @Param('id') id: string,
+    @Body() dto: ChangeStatusDto,
+  ) {
+    return this.eventsSvc.changeStatus(company.id, id, dto);
   }
 }

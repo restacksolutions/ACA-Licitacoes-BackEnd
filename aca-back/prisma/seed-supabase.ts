@@ -30,7 +30,7 @@ async function main() {
         create: [
           {
             userId: user.id,
-            role: RoleCompany.owner,
+            role: 'OWNER',
           },
         ],
       },
@@ -49,7 +49,7 @@ async function main() {
       editalUrl: 'https://example.com/edital-001-2025.pdf',
       sessionAt: new Date('2025-02-15T14:00:00Z'),
       submissionDeadline: new Date('2025-02-10T23:59:59Z'),
-      status: LicitacaoStatus.draft,
+      status: 'DRAFT',
       saleValue: 50000.00,
       notes: 'Licitação para aquisição de equipamentos de informática',
     },
@@ -61,6 +61,8 @@ async function main() {
   const companyDoc = await prisma.companyDocument.create({
     data: {
       companyId: company.id,
+      name: 'CNPJ',
+      type: 'CNPJ',
       docType: 'cnpj',
       docNumber: '12.345.678/0001-90',
       issuer: 'Receita Federal',
@@ -78,14 +80,18 @@ async function main() {
     data: [
       {
         licitacaoId: licitacao.id,
-        docType: LicitacaoDocType.proposta,
+        name: 'Proposta Técnica e Comercial',
+        type: 'PROPOSTA',
+        docType: 'PROPOSTA',
         required: true,
         filePath: 'docs/licitacoes/proposta-001.pdf',
         notes: 'Proposta técnica e comercial',
       },
       {
         licitacaoId: licitacao.id,
-        docType: LicitacaoDocType.habilitacao,
+        name: 'Documentos de Habilitação',
+        type: 'HABILITACAO',
+        docType: 'HABILITACAO',
         required: true,
         filePath: 'docs/licitacoes/habilitacao-001.pdf',
         notes: 'Documentos de habilitação',
@@ -99,7 +105,9 @@ async function main() {
   const event = await prisma.licitacaoEvent.create({
     data: {
       licitacaoId: licitacao.id,
-      newStatus: LicitacaoStatus.draft,
+      title: 'Licitação criada',
+      eventDate: new Date(),
+      newStatus: 'DRAFT',
       description: 'Licitação criada',
       createdById: user.id,
     },

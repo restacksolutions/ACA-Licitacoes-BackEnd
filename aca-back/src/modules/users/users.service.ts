@@ -63,8 +63,16 @@ export class UsersService {
       // Busca eventos recentes
       const recentEvents = await this.prisma.licitacaoEvent.findMany({
         where: { createdById: user.id },
-        orderBy: { eventAt: 'desc' },
-        take: 15
+        orderBy: { eventDate: 'desc' },
+        take: 15,
+        select: {
+          id: true,
+          createdById: true,
+          description: true,
+          eventDate: true,
+          newStatus: true,
+          licitacaoId: true
+        }
       });
       
       return {
@@ -75,7 +83,7 @@ export class UsersService {
         createdAt: user.createdAt.toISOString(),
         memberships: memberships.length > 0 ? memberships.map(membership => ({
           membershipId: membership.id,
-          role: membership.role,
+          role: membership.role as any,
           joinedAt: membership.createdAt.toISOString(),
           company: {
             id: membership.company.id,
@@ -114,9 +122,8 @@ export class UsersService {
         })) : [],
         recentActivity: recentEvents.length > 0 ? recentEvents.map(event => ({
           id: event.id,
-          eventAt: event.eventAt.toISOString(),
+          eventAt: event.eventDate.toISOString(),
           description: event.description,
-          oldStatus: event.oldStatus,
           newStatus: event.newStatus
         })) : [],
         stats: {

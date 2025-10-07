@@ -14,7 +14,8 @@ export class BidsService {
     const data = {
       ...dto,
       companyId,
-      saleValue: dto.saleValue ? parseFloat(dto.saleValue) : null
+      saleValue: dto.saleValue ? parseFloat(dto.saleValue) : null,
+      status: dto.status || 'DRAFT' as any
     };
     return this.prisma.licitacao.create({ data });
   }
@@ -28,7 +29,8 @@ export class BidsService {
   update(companyId: string, bidId: string, dto: Partial<CreateBidDto>) {
     const data = {
       ...dto,
-      saleValue: dto.saleValue ? parseFloat(dto.saleValue) : undefined
+      saleValue: dto.saleValue ? parseFloat(dto.saleValue) : undefined,
+      status: dto.status as any
     };
     return this.prisma.licitacao.update({ where: { id: bidId }, data });
   }

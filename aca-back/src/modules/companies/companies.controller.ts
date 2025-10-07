@@ -13,6 +13,7 @@ import { CreateCompanyDto, UpdateCompanyDto, CompanyResponseDto } from './dto/co
 import { UserHelper } from '../../core/security/user-helper.service';
 import { DocumentsService } from '../documents/documents.service';
 import { DocumentListQueryDto, UploadDocumentDto, UpdateCompanyDocDto } from '../documents/dto/document.dto';
+import { PaginationDto } from '../../core/dto/pagination.dto';
 
 @ApiTags('Companies')
 @ApiBearerAuth('bearer')
@@ -26,8 +27,13 @@ export class CompaniesController {
   ) {}
 
   @Get()
-  async myCompanies(@CurrentUser() user: { authUserId: string }) {
-    return this.svc.myCompanies(user.authUserId);
+  @ApiOperation({ summary: 'Listar empresas do usuário' })
+  @ApiResponse({ status: 200, description: 'Lista de empresas com paginação' })
+  async myCompanies(
+    @CurrentUser() user: { authUserId: string },
+    @Query() query: PaginationDto,
+  ) {
+    return this.svc.myCompanies(user.authUserId, query);
   }
 
   @Post()

@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { CreateCompanyDto, UpdateCompanyDto } from './dto/company.dto';
+import { PaginationDto, PaginatedResponse, PaginationMeta } from '../../core/dto/pagination.dto';
 
 @Injectable()
 export class CompaniesService {
@@ -45,11 +46,42 @@ export class CompaniesService {
     }
   }
 
-  async myCompanies(authUserId: string) {
+  async myCompanies(authUserId: string, pagination: PaginationDto): Promise<PaginatedResponse<any>> {
+    const { page = 1, perPage = 20, sort = 'createdAt', order = 'desc' } = pagination;
+    const skip = (page - 1) * perPage;
+
     const user = await this.prisma.appUser.findUnique({
       where: { authUserId },
-      include: { memberships: { include: { company: true } } },
+      include: { 
+        memberships: { 
+          include: { company: true },
+          skip,
+          take: perPage,
+          orderBy: { [sort]: order },
+        } 
+      },
     });
-    return user?.memberships?.map(m => ({ role: m.role, company: m.company })) ?? [];
+
+    const companies = user?.memberships?.map(m => ({ 
+      role: m.role, 
+      company: m.company 
+    })) ?? [];
+
+    // Contar total para paginação
+    const total = await this.prisma.companyMember.count({
+      where: { userId: user?.id },
+    });
+
+    const meta: PaginationMeta = {
+      page,
+      perPage,
+      total,
+      totalPages: Math.ceil(total / perPage),
+    };
+
+    return {
+      data: companies,
+      meta,
+    };
   }
 }
