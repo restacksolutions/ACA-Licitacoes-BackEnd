@@ -1,219 +1,96 @@
-import {
-  Injectable,
-  NotFoundException,
-  ConflictException,
-} from '@nestjs/common';
-import { PrismaService } from '../../core/prisma/prisma.service';
-import { SupabaseAuthService } from '../../core/auth/supabase-auth.service';
-import { LoginDto, LoginResponseDto } from './dto/login.dto';
-import { RegisterDto, RegisterResponseDto } from './dto/register.dto';
-
-interface AuthResult {
-  user_id: string;
-  email: string;
-  access_token: string;
-  expires_at: string;
-}
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { PrismaService } from '../../common/utils/prisma.service';
+import { RegisterDto, LoginDto } from './dto';
+import * as argon2 from 'argon2';
+import { JwtService } from '@nestjs/jwt';
+import { AppUser, Company } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
   constructor(
     private prisma: PrismaService,
-    private supabaseAuth: SupabaseAuthService,
+    private jwt: JwtService,
   ) {}
 
-  async login(loginDto: LoginDto): Promise<LoginResponseDto> {
-    const authResult = (await this.supabaseAuth.login(
-      loginDto.email,
-      loginDto.password,
-    )) as AuthResult;
-
-    // Verifica se o usuário existe no banco local, se não, cria
-    let user = await this.prisma.appUser.findUnique({
-      where: { authUserId: authResult.user_id },
-      include: {
-        memberships: {
-          include: { company: true },
-        },
+  private async issueTokens(sub: string, email: string) {
+    const accessToken = await this.jwt.signAsync(
+      { sub, email },
+      {
+        secret: process.env.JWT_ACCESS_SECRET!,
+        expiresIn: process.env.JWT_ACCESS_TTL || '15m',
       },
-    });
-
-    if (!user) {
-      // Cria o usuário no banco local se não existir
-      const email = authResult.email || '';
-      const defaultName = email.includes('@') ? email.split('@')[0] : 'Usuário';
-
-      user = await this.prisma.appUser.create({
-        data: {
-          authUserId: authResult.user_id,
-          email: email,
-          fullName: defaultName,
-        },
-        include: {
-          memberships: {
-            include: { company: true },
-          },
-        },
-      });
-    }
-
-    // Garantir que o usuário tenha pelo menos uma empresa
-    if (!user.memberships || user.memberships.length === 0) {
-      // Criar empresa padrão para usuários órfãos
-      await this.prisma.$transaction(async (tx) => {
-        const companyName =
-          user?.fullName ||
-          (user?.email ? user.email.split('@')[0] : 'Usuário');
-
-        const company = await tx.company.create({
-          data: {
-            name: `Empresa de ${companyName}`,
-            createdById: user!.id,
-          },
-        });
-
-        await tx.companyMember.create({
-          data: {
-            companyId: company.id,
-            userId: user!.id,
-            role: 'OWNER',
-          },
-        });
-      });
-
-      // Recarregar o usuário com as memberships
-      user = await this.prisma.appUser.findUnique({
-        where: { authUserId: authResult.user_id },
-        include: {
-          memberships: {
-            include: { company: true },
-          },
-        },
-      });
-    }
-
-    // Retornar a primeira empresa como ativa (no futuro pode ser selecionada pelo usuário)
-    const activeCompany = user?.memberships?.[0]?.company;
-
-    return {
-      ...authResult,
-      active_company_id: activeCompany?.id || '',
-      active_company_name: activeCompany?.name || '',
-    };
+    );
+    const refreshToken = await this.jwt.signAsync(
+      { sub, email, type: 'refresh' },
+      {
+        secret: process.env.JWT_REFRESH_SECRET!,
+        expiresIn: process.env.JWT_REFRESH_TTL || '7d',
+      },
+    );
+    return { accessToken, refreshToken };
   }
 
-  async register(registerDto: RegisterDto): Promise<RegisterResponseDto> {
-    // Verifica se o email já existe
-    const existingUser = await this.prisma.appUser.findUnique({
-      where: { email: registerDto.email },
-    });
+  async register(dto: RegisterDto) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      const exists: AppUser | null = await this.prisma.appUser.findUnique({
+        where: { email: dto.email },
+      });
+      if (exists) throw new UnauthorizedException('Email already used');
 
-    if (existingUser) {
-      throw new ConflictException('Email já está em uso');
-    }
-
-    // Verifica se o CNPJ já existe (se fornecido)
-    if (registerDto.companyCnpj) {
-      const existingCompany = await this.prisma.company.findUnique({
-        where: { cnpj: registerDto.companyCnpj },
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      const user: AppUser = await this.prisma.appUser.create({
+        data: {
+          email: dto.email,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+          passwordHash: await argon2.hash(dto.password),
+          fullName: dto.fullName ?? null,
+        },
       });
 
-      if (existingCompany) {
-        throw new ConflictException('CNPJ já está em uso');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      const company: Company = await this.prisma.company.create({
+        data: { name: dto.companyName, cnpj: dto.cnpj, createdById: user.id },
+      });
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      await this.prisma.companyMember.create({
+        data: { companyId: company.id, userId: user.id, role: 'owner' },
+      });
+
+      return this.issueTokens(user.id, user.email);
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
       }
+      throw new UnauthorizedException('Registration failed');
     }
-
-    // Registra o usuário no Supabase
-    const authResult = (await this.supabaseAuth.register(
-      registerDto.email,
-      registerDto.password,
-    )) as AuthResult;
-
-    // Cria o usuário e a empresa em uma transação
-    const result = await this.prisma.$transaction(async (tx) => {
-      // Cria o usuário no banco local
-      const user = await tx.appUser.create({
-        data: {
-          authUserId: authResult.user_id,
-          email: registerDto.email,
-          fullName: registerDto.fullName,
-        },
-      });
-
-      // Cria a empresa
-      const company = await tx.company.create({
-        data: {
-          name: registerDto.companyName,
-          cnpj: registerDto.companyCnpj,
-          phone: registerDto.companyPhone,
-          address: registerDto.companyAddress,
-          createdById: user.id,
-        },
-      });
-
-      // Cria a associação do usuário com a empresa como owner
-      await tx.companyMember.create({
-        data: {
-          companyId: company.id,
-          userId: user.id,
-          role: 'OWNER',
-        },
-      });
-
-      return { user, company };
-    });
-
-    return {
-      ...authResult,
-      company_id: result.company.id,
-    };
   }
 
-  async me(authUserId: string) {
-    const user = await this.prisma.appUser.findUnique({
-      where: { authUserId },
-      include: {
-        memberships: {
-          include: { company: true },
-        },
-      },
-    });
-
-    if (!user) {
-      throw new NotFoundException('Usuário não encontrado');
-    }
-
-    // Garantir que o usuário tenha pelo menos uma empresa
-    if (!user.memberships || user.memberships.length === 0) {
-      // Criar empresa padrão para usuários órfãos
-      await this.prisma.$transaction(async (tx) => {
-        const company = await tx.company.create({
-          data: {
-            name: `Empresa de ${user.fullName || (user.email ? user.email.split('@')[0] : 'Usuário')}`,
-            createdById: user.id,
-          },
-        });
-
-        await tx.companyMember.create({
-          data: {
-            companyId: company.id,
-            userId: user.id,
-            role: 'OWNER',
-          },
-        });
+  async login(dto: LoginDto) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      const user: AppUser | null = await this.prisma.appUser.findUnique({
+        where: { email: dto.email },
       });
-
-      // Recarregar o usuário com as memberships
-      return await this.prisma.appUser.findUnique({
-        where: { authUserId },
-        include: {
-          memberships: {
-            include: { company: true },
-          },
-        },
-      });
+      if (!user) throw new UnauthorizedException('Invalid credentials');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      const ok: boolean = await argon2.verify(user.passwordHash, dto.password);
+      if (!ok) throw new UnauthorizedException('Invalid credentials');
+      return this.issueTokens(user.id, user.email);
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      throw new UnauthorizedException('Login failed');
     }
+  }
 
-    return user;
+  async refresh(userId: string, email: string) {
+    try {
+      return this.issueTokens(userId, email);
+    } catch {
+      throw new UnauthorizedException('Token refresh failed');
+    }
   }
 }

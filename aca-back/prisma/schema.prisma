@@ -3,182 +3,150 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
-}
-
-model AppUser {
-  id               String           @id @default(cuid())
-  authUserId       String?          @unique @map("auth_user_id") @db.Uuid
-  fullName         String?
-  email            String           @unique
-  passwordHash     String?
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-  createdCompanies Company[]        @relation("CompanyCreatedBy")
-  memberships      CompanyMember[]
-  events           LicitacaoEvent[]
-
-  @@index([createdAt])
-  @@map("app_users")
-}
-
-model Company {
-  id             String            @id @default(cuid())
-  name           String
-  cnpj           String?           @unique
-  phone          String?
-  address        String?
-  logoPath       String?
-  letterheadPath String?
-  active         Boolean           @default(true)
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
-  createdById    String            @map("created_by_id")
-  createdBy      AppUser           @relation("CompanyCreatedBy", fields: [createdById], references: [id])
-  documents      CompanyDocument[]
-  members        CompanyMember[]
-  licitacoes     Licitacao[]
-
-  @@index([createdById])
-  @@index([createdAt])
-  @@map("companies")
-}
-
-model CompanyMember {
-  id        String      @id @default(cuid())
-  companyId String      @map("company_id")
-  userId    String      @map("user_id")
-  role      RoleCompany @default(MEMBER)
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-  company   Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  user      AppUser     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([companyId, userId])
-  @@index([role])
-  @@index([createdAt])
-  @@map("company_members")
-}
-
-model CompanyDocument {
-  id        String   @id @default(cuid())
-  companyId String   @map("company_id")
-  name      String
-  type      String
-  docType   String   // Mudado de enum para string para permitir formato "Cliente - Tipo"
-  docNumber String?
-  issuer    String?
-  issueDate DateTime?
-  expiresAt DateTime?
-  filePath  String?
-  notes     String?
-  version   Int      @default(1)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
-  @@unique([companyId, docType, version])
-  @@index([companyId, docType])
-  @@index([expiresAt])
-  @@map("company_documents")
-}
-
-model Licitacao {
-  id                 String              @id @default(cuid())
-  companyId          String              @map("company_id")
-  title              String
-  orgao              String?
-  modalidade         String?
-  editalUrl          String?
-  sessionAt          DateTime?
-  submissionDeadline DateTime?
-  status             LicitacaoStatus     @default(DRAFT)
-  saleValue          Decimal?            @db.Decimal(12, 2)
-  notes              String?
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
-  documents          LicitacaoDocument[]
-  events             LicitacaoEvent[]
-  company            Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
-  @@index([companyId, createdAt])
-  @@index([status])
-  @@index([submissionDeadline])
-  @@map("licitacoes")
-}
-
-model LicitacaoDocument {
-  id                    String           @id @default(cuid())
-  licitacaoId           String           @map("licitacao_id")
-  name                  String
-  type                  String
-  docType               LicitacaoDocType
-  required              Boolean          @default(true)
-  submitted             Boolean          @default(false)
-  signed                Boolean          @default(false)
-  issueDate             DateTime?
-  expiresAt             DateTime?
-  filePath              String?
-  generatedFromTemplate Boolean          @default(false)
-  templatePath          String?
-  version               Int              @default(1)
-  notes                 String?
-  createdAt             DateTime         @default(now())
-  updatedAt             DateTime         @updatedAt
-  licitacao             Licitacao        @relation(fields: [licitacaoId], references: [id], onDelete: Cascade)
-
-  @@unique([licitacaoId, docType, version])
-  @@index([licitacaoId, docType])
-  @@index([expiresAt])
-  @@map("licitacao_documents")
-}
-
-model LicitacaoEvent {
-  id          String           @id @default(cuid())
-  licitacaoId String           @map("licitacao_id")
-  title       String
-  eventDate   DateTime         @default(now())
-  oldStatus   LicitacaoStatus?
-  newStatus   LicitacaoStatus?
-  description String?
-  createdById String?          @map("created_by_id")
-  createdBy   AppUser?         @relation(fields: [createdById], references: [id])
-  licitacao   Licitacao        @relation(fields: [licitacaoId], references: [id], onDelete: Cascade)
-
-  @@index([licitacaoId, eventDate])
-  @@index([newStatus])
-  @@map("licitacao_events")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 enum RoleCompany {
-  OWNER
-  ADMIN
-  MEMBER
+  owner
+  admin
+  member
 }
 
 enum LicitacaoStatus {
-  DRAFT
-  OPEN
-  CLOSED
-  CANCELLED
-  AWARDED
+  draft
+  open
+  closed
+  cancelled
+  awarded
 }
 
-enum CompanyDocType {
-  CNPJ
-  CERTIDAO
-  PROCURACAO
-  INSCRICAO_ESTADUAL
-  OUTRO
+model AppUser {
+  id           String          @id @default(uuid())
+  email        String          @unique
+  passwordHash String          @map("password_hash")
+  fullName     String?         @map("full_name")
+  createdAt    DateTime        @default(now()) @map("created_at")
+  updatedAt    DateTime        @updatedAt @map("updated_at")
+  memberships  CompanyMember[]
+  companies    Company[]       @relation("CompanyCreatedBy")
 }
 
-enum LicitacaoDocType {
-  EDITAL
-  ANEXO
-  ADITIVO
-  OUTROS
-  PROPOSTA
-  HABILITACAO
+model Company {
+  id          String   @id @default(uuid())
+  name        String
+  cnpj        String   @unique
+  active      Boolean  @default(true)
+  createdById String   @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  createdBy  AppUser           @relation("CompanyCreatedBy", fields: [createdById], references: [id])
+  members    CompanyMember[]
+  documents  CompanyDocument[]
+  licitacoes Licitacao[]
+}
+
+model CompanyMember {
+  id        String      @id @default(uuid())
+  companyId String      @map("company_id")
+  userId    String      @map("user_id")
+  role      RoleCompany
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  company Company @relation(fields: [companyId], references: [id])
+  user    AppUser @relation(fields: [userId], references: [id])
+
+  @@unique([companyId, userId])
+}
+
+model CompanyDocument {
+  id         String @id @default(uuid())
+  companyId  String @map("company_id")
+  clientName String @map("client_name")
+  docType    String @map("doc_type")
+
+  // Arquivo no banco (BYTEA)
+  fileName   String @map("file_name")
+  fileMime   String @map("file_mime")
+  fileSize   Int    @map("file_size")
+  fileSha256 String @map("file_sha256")
+  fileData   Bytes  @map("file_data")
+
+  issueDate DateTime? @map("issue_date")
+  expiresAt DateTime? @map("expires_at")
+  notes     String?
+  version   Int       @default(1)
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@index([companyId, expiresAt])
+}
+
+model Licitacao {
+  id                 String          @id @default(uuid())
+  companyId          String          @map("company_id")
+  title              String
+  status             LicitacaoStatus
+  editalUrl          String?         @map("edital_url")
+  sessionDate        DateTime?       @map("session_date")
+  submissionDeadline DateTime?       @map("submission_deadline")
+  createdAt          DateTime        @default(now()) @map("created_at")
+  updatedAt          DateTime        @updatedAt @map("updated_at")
+
+  company   Company             @relation(fields: [companyId], references: [id])
+  documents LicitacaoDocument[]
+  events    LicitacaoEvent[]
+}
+
+model LicitacaoDocument {
+  id          String  @id @default(uuid())
+  licitacaoId String  @map("licitacao_id")
+  name        String
+  docType     String?
+  required    Boolean @default(true)
+  submitted   Boolean @default(false)
+  signed      Boolean @default(false)
+
+  fileName   String? @map("file_name")
+  fileMime   String? @map("file_mime")
+  fileSize   Int?    @map("file_size")
+  fileSha256 String? @map("file_sha256")
+  fileData   Bytes?  @map("file_data")
+
+  issueDate DateTime? @map("issue_date")
+  expiresAt DateTime? @map("expires_at")
+  notes     String?
+
+  licitacao Licitacao @relation(fields: [licitacaoId], references: [id])
+
+  // NÃO TER unique aqui
+  @@index([licitacaoId, name]) // (opcional, mas útil para filtrar/ordenar)
+}
+
+model LicitacaoEvent {
+  id          String   @id @default(uuid())
+  licitacaoId String   @map("licitacao_id")
+  type        String
+  payload     Json
+  createdById String   @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  licitacao Licitacao @relation(fields: [licitacaoId], references: [id])
+}
+
+model CarBrand {
+  id     String         @id @default(uuid())
+  name   String         @unique
+  models VehicleModel[]
+}
+
+model VehicleModel {
+  id      String @id @default(uuid())
+  brandId String @map("brand_id")
+  name    String
+  specs   Json
+
+  brand CarBrand @relation(fields: [brandId], references: [id])
 }

@@ -1,30 +1,12 @@
-version: '3.8'
-
 services:
-  aca-backend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: aca-licitacoes-backend
-    restart: unless-stopped
-    command: sh -c "npx prisma migrate deploy && node dist/main.js"
-    env_file:
-      - .env.local
+  db:
+    image: postgres:16
     environment:
-      NODE_ENV: production
-      PORT: 3000
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: aca
     ports:
-      - "3000:3000"
+      - "5432:5432"
     volumes:
-      - ./uploads:/app/uploads
-    networks:
-      - aca-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health/ready"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-networks:
-  aca-network:
-    driver: bridge
+      - db_data:/var/lib/postgresql/data
+volumes:
+  db_data:

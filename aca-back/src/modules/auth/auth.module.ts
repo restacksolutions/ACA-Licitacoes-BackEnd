@@ -1,8 +1,12 @@
 import { Module } from '@nestjs/common';
+import { JwtModule } from '@nestjs/jwt';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
-import { JwtStrategy } from '../../core/security/jwt.strategy';
-import { SupabaseAuthService } from '../../core/auth/supabase-auth.service';
+import { PrismaService } from '../../common/utils/prisma.service';
 
-@Module({ providers: [AuthService, JwtStrategy, SupabaseAuthService], controllers: [AuthController] })
+@Module({
+  imports: [JwtModule.register({})],
+  controllers: [AuthController],
+  providers: [AuthService, PrismaService],
+})
 export class AuthModule {}
