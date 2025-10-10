@@ -18,10 +18,20 @@ export class CompanyGuard implements CanActivate {
   constructor(private prisma: PrismaService) {}
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
     const req = ctx.switchToHttp().getRequest<RequestWithUser>();
-    const companyId = req.headers['x-company-id'] as string;
+
+    // Tenta pegar o companyId do header primeiro, depois da URL
+    let companyId = req.headers['x-company-id'] as string;
     if (!companyId || typeof companyId !== 'string') {
-      throw new ForbiddenException('X-Company-Id required');
+      // Se não tem no header, tenta pegar da URL (para rotas como /companies/:id/members)
+      companyId = req.params?.companyId;
     }
+
+    if (!companyId || typeof companyId !== 'string') {
+      throw new ForbiddenException(
+        'Company ID required (X-Company-Id header or companyId param)',
+      );
+    }
+
     const userId = req.user?.sub;
     if (!userId) throw new ForbiddenException('No user');
 
