@@ -7,6 +7,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { CompaniesModule } from './modules/companies/companies.module';
 import { MembersModule } from './modules/members/members.module';
 import { CompanyDocsModule } from './modules/company-docs/company-docs.module';
+import { VehiclesModule } from './modules/vehicles/vehicles.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { CompanyDocsModule } from './modules/company-docs/company-docs.module';
     MembersModule,
     CompanyDocsModule,
     ConfigModule.forRoot({ isGlobal: true }),
+    VehiclesModule,
   ],
   controllers: [AppController, HealthController],
   providers: [AppService],

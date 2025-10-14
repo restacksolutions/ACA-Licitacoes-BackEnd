@@ -58,7 +58,13 @@ export class AuthService {
         data: { companyId: company.id, userId: user.id, role: 'owner' },
       });
 
-      return this.issueTokens(user.id, user.email);
+      const tokens = await this.issueTokens(user.id, user.email);
+      return {
+        ...tokens,
+        user_id: user.id,
+        email: user.email,
+        company_id: company.id
+      };
     } catch (error) {
       if (error instanceof UnauthorizedException) {
         throw error;
@@ -77,7 +83,13 @@ export class AuthService {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const ok: boolean = await argon2.verify(user.passwordHash, dto.password);
       if (!ok) throw new UnauthorizedException('Invalid credentials');
-      return this.issueTokens(user.id, user.email);
+      
+      const tokens = await this.issueTokens(user.id, user.email);
+      return {
+        ...tokens,
+        user_id: user.id,
+        email: user.email
+      };
     } catch (error) {
       if (error instanceof UnauthorizedException) {
         throw error;

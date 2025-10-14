@@ -6,6 +6,25 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // Configuração do CORS
+  app.enableCors({
+    origin: [
+      'http://localhost:4200',  // Angular dev server
+      'http://127.0.0.1:4200', // Angular dev server (alternativo)
+      'http://localhost:3000',  // Swagger UI
+    ],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+      'Origin',
+      'X-Requested-With',
+      'Content-Type',
+      'Accept',
+      'Authorization',
+      'X-Company-Id',
+    ],
+  });
+
   const config = new DocumentBuilder()
     .setTitle('ACA Licitações API')
     .setDescription('API da plataforma')

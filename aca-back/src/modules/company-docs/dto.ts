@@ -1,72 +1,34 @@
-import {
-  IsDateString,
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-  IsNumber,
-} from 'class-validator';
+import { IsDateString, IsNotEmpty, IsOptional } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateCompanyDocDto {
   @ApiProperty({
-    description: 'Nome do cliente/empresa do documento',
-    example: 'Acme Ltda',
+    description: 'ID da empresa (obrigatório)',
+    example: 'da6cc36e-b112-4301-ae6d-f824ccf944ad',
   })
   @IsNotEmpty()
-  @IsString()
+  company_id: string;
+
+  @ApiProperty({
+    description: 'Nome do cliente ou empresa',
+    example: 'Empresa ABC Ltda',
+    minLength: 1,
+  })
+  @IsNotEmpty()
   clientName: string;
 
   @ApiProperty({
     description: 'Tipo do documento',
-    example: 'Certidão Negativa',
+    example: 'Contrato de Prestação de Serviços',
+    minLength: 1,
   })
   @IsNotEmpty()
-  @IsString()
   docType: string;
-
-  @ApiProperty({
-    description: 'Nome do arquivo',
-    example: 'certidao-negativa.pdf',
-  })
-  @IsNotEmpty()
-  @IsString()
-  fileName: string;
-
-  @ApiProperty({
-    description: 'Tipo MIME do arquivo',
-    example: 'application/pdf',
-  })
-  @IsNotEmpty()
-  @IsString()
-  fileMime: string;
-
-  @ApiProperty({
-    description: 'Tamanho do arquivo em bytes',
-    example: 1024000,
-  })
-  @IsNotEmpty()
-  @IsNumber()
-  fileSize: number;
-
-  @ApiProperty({
-    description: 'Hash SHA256 do arquivo',
-    example: 'a1b2c3d4e5f6...',
-  })
-  @IsNotEmpty()
-  @IsString()
-  fileSha256: string;
-
-  @ApiProperty({
-    description: 'Dados binários do arquivo',
-    type: 'string',
-    format: 'binary',
-  })
-  @IsNotEmpty()
-  fileData: Buffer;
 
   @ApiPropertyOptional({
     description: 'Data de emissão do documento',
-    example: '2025-10-07',
+    example: '2024-01-15T00:00:00.000Z',
+    format: 'date-time',
   })
   @IsOptional()
   @IsDateString()
@@ -74,81 +36,43 @@ export class CreateCompanyDocDto {
 
   @ApiPropertyOptional({
     description: 'Data de expiração do documento',
-    example: '2026-10-07',
+    example: '2024-12-31T23:59:59.000Z',
+    format: 'date-time',
   })
   @IsOptional()
   @IsDateString()
   expiresAt?: string;
 
   @ApiPropertyOptional({
-    description: 'Observações adicionais',
-    example: 'Documento renovado em 2025',
+    description: 'Observações adicionais sobre o documento',
+    example: 'Contrato de prestação de serviços de consultoria',
+    maxLength: 1000,
   })
   @IsOptional()
-  @IsString()
   notes?: string;
 }
 
 export class UpdateCompanyDocDto {
   @ApiPropertyOptional({
-    description: 'Nome do cliente/empresa do documento',
-    example: 'Acme Ltda',
+    description: 'Nome do cliente ou empresa',
+    example: 'Empresa ABC Ltda - Atualizada',
+    minLength: 1,
   })
   @IsOptional()
-  @IsString()
   clientName?: string;
 
   @ApiPropertyOptional({
     description: 'Tipo do documento',
-    example: 'Certidão Negativa',
+    example: 'Contrato de Prestação de Serviços',
+    minLength: 1,
   })
   @IsOptional()
-  @IsString()
   docType?: string;
 
   @ApiPropertyOptional({
-    description: 'Nome do arquivo',
-    example: 'certidao-negativa-v2.pdf',
-  })
-  @IsOptional()
-  @IsString()
-  fileName?: string;
-
-  @ApiPropertyOptional({
-    description: 'Tipo MIME do arquivo',
-    example: 'application/pdf',
-  })
-  @IsOptional()
-  @IsString()
-  fileMime?: string;
-
-  @ApiPropertyOptional({
-    description: 'Tamanho do arquivo em bytes',
-    example: 1024000,
-  })
-  @IsOptional()
-  @IsNumber()
-  fileSize?: number;
-
-  @ApiPropertyOptional({
-    description: 'Hash SHA256 do arquivo',
-    example: 'a1b2c3d4e5f6...',
-  })
-  @IsOptional()
-  @IsString()
-  fileSha256?: string;
-
-  @ApiPropertyOptional({
-    description: 'Dados binários do arquivo',
-    type: 'string',
-    format: 'binary',
-  })
-  @IsOptional()
-  fileData?: Buffer;
-
-  @ApiPropertyOptional({
     description: 'Data de emissão do documento',
-    example: '2025-10-07',
+    example: '2024-01-15T00:00:00.000Z',
+    format: 'date-time',
   })
   @IsOptional()
   @IsDateString()
@@ -156,26 +80,26 @@ export class UpdateCompanyDocDto {
 
   @ApiPropertyOptional({
     description: 'Data de expiração do documento',
-    example: '2026-10-07',
+    example: '2024-12-31T23:59:59.000Z',
+    format: 'date-time',
   })
   @IsOptional()
   @IsDateString()
   expiresAt?: string;
 
   @ApiPropertyOptional({
-    description: 'Observações adicionais',
-    example: 'Documento renovado em 2025',
+    description: 'Observações adicionais sobre o documento',
+    example: 'Contrato atualizado com novas cláusulas',
+    maxLength: 1000,
   })
   @IsOptional()
-  @IsString()
   notes?: string;
 
   @ApiPropertyOptional({
-    description:
-      'Versão do documento (incrementa automaticamente ao trocar arquivo)',
+    description: 'Versão do documento (gerenciada automaticamente)',
     example: 2,
+    minimum: 1,
   })
   @IsOptional()
-  @IsNumber()
   version?: number;
 }
