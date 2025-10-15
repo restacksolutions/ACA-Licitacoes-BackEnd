@@ -1,47 +1,108 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards, NotFoundException } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../core/security/jwt-auth.guard';
-import { CompanyGuard } from '../../core/tenancy/company.guard';
-import { RolesGuard } from '../../core/security/roles.guard';
-import { Roles } from '../../core/security/roles.decorator';
-import { CurrentUser } from '../../core/security/current-user.decorator';
-import { CurrentCompany } from '../../core/tenancy/current-company.decorator';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiParam,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { CompaniesService } from './companies.service';
-import { CreateCompanyDto, UpdateCompanyDto, CompanyResponseDto } from './dto/company.dto';
-import { UserHelper } from '../../core/security/user-helper.service';
+import { CreateCompanyDto, UpdateCompanyDto } from './dto';
+import { JwtAccessGuard } from '../../common/guards/jwt-access.guard';
+import { CompanyGuard } from '../../common/guards/company.guard';
+import { requireOwner } from '../../common/utils/roles.util';
+import { Request } from 'express';
 
-@ApiTags('Companies')
-@ApiBearerAuth('bearer')
-@UseGuards(JwtAuthGuard)
+interface RequestWithUser extends Request {
+  user: { sub: string; email: string };
+  companyId?: string;
+  membership?: { role: string; [key: string]: any };
+}
+
+@ApiTags('companies')
 @Controller('companies')
+@UseGuards(JwtAccessGuard)
+@ApiBearerAuth('access')
+@ApiBearerAuth('company-id')
 export class CompaniesController {
-  constructor(
-    private readonly svc: CompaniesService,
-    private readonly userHelper: UserHelper,
-  ) {}
+  constructor(private service: CompaniesService) {}
 
+  // Lista empresas onde o usuário tem membership
   @Get()
-  async myCompanies(@CurrentUser() user: { authUserId: string }) {
-    return this.svc.myCompanies(user.authUserId);
+  @ApiOperation({ summary: 'Listar empresas do usuário' })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Termo de busca por nome da empresa',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de empresas retornada com sucesso',
+  })
+  list(@Req() req: RequestWithUser, @Query('search') search?: string) {
+    return this.service.listByUser(req.user.sub, search);
   }
 
+  // Cria nova empresa e torna o usuário atual owner
   @Post()
-  async create(@Body() dto: CreateCompanyDto, @CurrentUser() user: { authUserId: string }) {
-    const userId = await this.userHelper.internalUserId(user.authUserId);
-    if (!userId) throw new NotFoundException('Usuário não encontrado no sistema');
-    return this.svc.create(dto, userId);
+  @ApiOperation({ summary: 'Criar nova empresa' })
+  @ApiResponse({ status: 201, description: 'Empresa criada com sucesso' })
+  @ApiResponse({ status: 400, description: 'Dados inválidos' })
+  create(@Req() req: RequestWithUser, @Body() dto: CreateCompanyDto) {
+    return this.service.createAndOwn(req.user.sub, dto);
   }
 
+  // Leitura de uma empresa específica dentro do escopo
+  @Get(':id')
   @UseGuards(CompanyGuard)
-  @Get(':companyId')
-  async get(@Param('companyId') companyId: string, @CurrentCompany() _ctx: string) {
-    return this.svc.getById(companyId);
+  @ApiOperation({ summary: 'Obter empresa por ID' })
+  @ApiParam({ name: 'id', description: 'ID da empresa' })
+  @ApiResponse({ status: 200, description: 'Empresa encontrada' })
+  @ApiResponse({ status: 404, description: 'Empresa não encontrada' })
+  @ApiResponse({ status: 403, description: 'Acesso negado' })
+  getOne(@Req() req: RequestWithUser, @Param('id') id: string) {
+    return this.service.getByIdForUser(id, req.user.sub);
   }
 
-  @UseGuards(CompanyGuard, RolesGuard)
-  @Roles('owner','admin')
-  @Patch(':companyId')
-  async update(@Param('companyId') companyId: string, @Body() dto: UpdateCompanyDto) {
-    return this.svc.update(companyId, dto);
+  // Atualização restrita a owner/admin (usaremos owner no MVP)
+  @Patch(':id')
+  @UseGuards(CompanyGuard)
+  @ApiOperation({ summary: 'Atualizar empresa' })
+  @ApiParam({ name: 'id', description: 'ID da empresa' })
+  @ApiResponse({ status: 200, description: 'Empresa atualizada com sucesso' })
+  @ApiResponse({ status: 403, description: 'Apenas owner pode atualizar' })
+  @ApiResponse({ status: 404, description: 'Empresa não encontrada' })
+  update(
+    @Req() req: RequestWithUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateCompanyDto,
+  ) {
+    requireOwner(req); // troque por requireAdminOrOwner(req) se desejar
+    return this.service.update(req.companyId!, dto);
+  }
+
+  // Exclusão: apenas owner
+  @Delete(':id')
+  @UseGuards(CompanyGuard)
+  @ApiOperation({ summary: 'Excluir empresa' })
+  @ApiParam({ name: 'id', description: 'ID da empresa' })
+  @ApiResponse({ status: 200, description: 'Empresa excluída com sucesso' })
+  @ApiResponse({ status: 403, description: 'Apenas owner pode excluir' })
+  @ApiResponse({ status: 404, description: 'Empresa não encontrada' })
+  remove(@Req() req: RequestWithUser) {
+    requireOwner(req);
+    return this.service.remove(req.companyId!);
   }
 }

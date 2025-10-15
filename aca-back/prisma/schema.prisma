@@ -22,139 +22,131 @@ enum LicitacaoStatus {
 }
 
 model AppUser {
-  id           String   @id @default(uuid())
-  authUserId   String   @unique @map("auth_user_id")
-  fullName     String?  @map("full_name")
-  email        String?  @unique
-  createdAt    DateTime @default(now()) @map("created_at")
+  id           String          @id @default(uuid())
+  email        String          @unique
+  passwordHash String          @map("password_hash")
+  fullName     String?         @map("full_name")
+  createdAt    DateTime        @default(now()) @map("created_at")
+  updatedAt    DateTime        @updatedAt @map("updated_at")
   memberships  CompanyMember[]
-  companies    Company[] @relation("CompanyCreatedBy")
-  events       LicitacaoEvent[]
-
-  @@map("app_users")
+  companies    Company[]       @relation("CompanyCreatedBy")
 }
 
 model Company {
-  id             String    @id @default(uuid())
-  name           String
-  cnpj           String?   @unique
-  phone          String?
-  address        String?
-  logoPath       String?   @map("logo_path")
-  letterheadPath String?   @map("letterhead_path")
-  active         Boolean   @default(true)
-  createdById    String    @map("created_by")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  createdBy      AppUser   @relation("CompanyCreatedBy", fields: [createdById], references: [id])
-  members        CompanyMember[]
-  documents      CompanyDocument[]
-  licitacoes     Licitacao[]
+  id          String   @id @default(uuid())
+  name        String
+  cnpj        String   @unique
+  active      Boolean  @default(true)
+  createdById String   @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
-  @@map("companies")
+  createdBy  AppUser           @relation("CompanyCreatedBy", fields: [createdById], references: [id])
+  members    CompanyMember[]
+  documents  CompanyDocument[]
+  licitacoes Licitacao[]
 }
 
 model CompanyMember {
   id        String      @id @default(uuid())
   companyId String      @map("company_id")
   userId    String      @map("user_id")
-  role      RoleCompany @default(member)
-  company   Company     @relation(fields: [companyId], references: [id])
-  user      AppUser     @relation(fields: [userId], references: [id])
+  role      RoleCompany
+  createdAt DateTime    @default(now()) @map("created_at")
 
-  @@map("company_members")
+  company Company @relation(fields: [companyId], references: [id])
+  user    AppUser @relation(fields: [userId], references: [id])
+
+  @@unique([companyId, userId])
 }
 
 model CompanyDocument {
-  id          String    @id @default(uuid())
-  companyId   String    @map("company_id")
-  docType     String    @map("doc_type")
-  docNumber   String?   @map("doc_number")
-  issuer      String?
-  issueDate   DateTime? @map("issue_date") @db.Date
-  expiresAt   DateTime? @map("expires_at") @db.Date
-  filePath    String?   @map("file_path")
-  notes       String?
-  version     Int       @default(1)
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-  company     Company   @relation(fields: [companyId], references: [id])
+  id         String @id @default(uuid())
+  companyId  String @map("company_id")
+  clientName String @map("client_name")
+  docType    String @map("doc_type")
 
-  @@map("company_documents")
+  // Arquivo no banco (BYTEA)
+  fileName   String @map("file_name")
+  fileMime   String @map("file_mime")
+  fileSize   Int    @map("file_size")
+  fileSha256 String @map("file_sha256")
+  fileData   Bytes  @map("file_data")
+
+  issueDate DateTime? @map("issue_date")
+  expiresAt DateTime? @map("expires_at")
+  notes     String?
+  version   Int       @default(1)
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@index([companyId, expiresAt])
 }
 
 model Licitacao {
-  id                String          @id @default(uuid())
-  companyId         String          @map("company_id")
-  title             String
-  orgao             String?
-  modalidade        String?
-  editalUrl         String?         @map("edital_url")
-  sessionAt         DateTime?       @map("session_at")
-  submissionDeadline DateTime?      @map("submission_deadline")
-  status            LicitacaoStatus @default(draft)
-  saleValue         Decimal?        @map("sale_value") @db.Decimal
-  notes             String?
-  createdAt         DateTime        @default(now()) @map("created_at")
-  updatedAt         DateTime        @updatedAt @map("updated_at")
-  company           Company         @relation(fields: [companyId], references: [id])
-  documents         LicitacaoDocument[]
-  events            LicitacaoEvent[]
+  id                 String          @id @default(uuid())
+  companyId          String          @map("company_id")
+  title              String
+  status             LicitacaoStatus
+  editalUrl          String?         @map("edital_url")
+  sessionDate        DateTime?       @map("session_date")
+  submissionDeadline DateTime?       @map("submission_deadline")
+  createdAt          DateTime        @default(now()) @map("created_at")
+  updatedAt          DateTime        @updatedAt @map("updated_at")
 
-  @@map("licitacoes")
+  company   Company             @relation(fields: [companyId], references: [id])
+  documents LicitacaoDocument[]
+  events    LicitacaoEvent[]
 }
 
 model LicitacaoDocument {
-  id                      String    @id @default(uuid())
-  licitacaoId             String    @map("licitacao_id")
-  docType                 String    @map("doc_type")
-  required                Boolean   @default(true)
-  submitted               Boolean   @default(false)
-  signed                  Boolean   @default(false)
-  issueDate               DateTime? @map("issue_date") @db.Date
-  expiresAt               DateTime? @map("expires_at") @db.Date
-  filePath                String?   @map("file_path")
-  generatedFromTemplate   Boolean   @default(false) @map("generated_from_template")
-  templatePath            String?   @map("template_path")
-  version                 Int       @default(1)
-  notes                   String?
-  createdAt               DateTime  @default(now()) @map("created_at")
-  updatedAt               DateTime  @updatedAt @map("updated_at")
-  licitacao               Licitacao @relation(fields: [licitacaoId], references: [id])
+  id          String  @id @default(uuid())
+  licitacaoId String  @map("licitacao_id")
+  name        String
+  docType     String?
+  required    Boolean @default(true)
+  submitted   Boolean @default(false)
+  signed      Boolean @default(false)
 
-  @@map("licitacao_documents")
+  fileName   String? @map("file_name")
+  fileMime   String? @map("file_mime")
+  fileSize   Int?    @map("file_size")
+  fileSha256 String? @map("file_sha256")
+  fileData   Bytes?  @map("file_data")
+
+  issueDate DateTime? @map("issue_date")
+  expiresAt DateTime? @map("expires_at")
+  notes     String?
+
+  licitacao Licitacao @relation(fields: [licitacaoId], references: [id])
+
+  // NÃO TER unique aqui
+  @@index([licitacaoId, name]) // (opcional, mas útil para filtrar/ordenar)
 }
 
 model LicitacaoEvent {
-  id          String          @id @default(uuid())
-  licitacaoId String          @map("licitacao_id")
-  eventAt     DateTime        @default(now()) @map("event_at")
-  oldStatus   LicitacaoStatus? @map("old_status")
-  newStatus   LicitacaoStatus? @map("new_status")
-  description String?
-  createdById String?         @map("created_by")
-  licitacao   Licitacao       @relation(fields: [licitacaoId], references: [id])
-  createdBy   AppUser?        @relation(fields: [createdById], references: [id])
+  id          String   @id @default(uuid())
+  licitacaoId String   @map("licitacao_id")
+  type        String
+  payload     Json
+  createdById String   @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
 
-  @@map("licitacao_events")
+  licitacao Licitacao @relation(fields: [licitacaoId], references: [id])
 }
 
 model CarBrand {
   id     String         @id @default(uuid())
   name   String         @unique
   models VehicleModel[]
-
-  @@map("car_brands")
 }
 
 model VehicleModel {
-  id        String   @id @default(uuid())
-  brandId   String   @map("brand_id")
-  modelName String   @map("model_name")
-  yearFrom  Int?     @map("year_from")
-  yearTo    Int?     @map("year_to")
-  specs     Json     @default("{}")
-  extraInfo String?  @map("extra_info")
-  brand     CarBrand @relation(fields: [brandId], references: [id])
+  id      String @id @default(uuid())
+  brandId String @map("brand_id")
+  name    String
+  specs   Json
 
-  @@map("vehicle_models")
+  brand CarBrand @relation(fields: [brandId], references: [id])
 }

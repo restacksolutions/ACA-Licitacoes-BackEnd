@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common';
-import { CompaniesService } from './companies.service';
 import { CompaniesController } from './companies.controller';
-import { UserHelper } from '../../core/security/user-helper.service';
-import { JwtStrategy } from '../../core/security/jwt.strategy';
-import { SupabaseAuthService } from '../../core/auth/supabase-auth.service';
+import { CompaniesService } from './companies.service';
+import { PrismaService } from '../../common/utils/prisma.service';
+import { AuthModule } from '../auth/auth.module';
 
-@Module({ 
-  providers: [CompaniesService, UserHelper, JwtStrategy, SupabaseAuthService], 
-  controllers: [CompaniesController] 
+@Module({
+  imports: [AuthModule],
+  controllers: [CompaniesController],
+  providers: [CompaniesService, PrismaService],
 })
 export class CompaniesModule {}

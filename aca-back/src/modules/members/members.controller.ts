@@ -1,42 +1,112 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../core/security/jwt-auth.guard';
-import { CompanyGuard } from '../../core/tenancy/company.guard';
-import { RolesGuard } from '../../core/security/roles.guard';
-import { Roles } from '../../core/security/roles.decorator';
-import { InviteMemberDto, UpdateMemberRoleDto, MemberResponseDto } from './dto/member.dto';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiParam,
+} from '@nestjs/swagger';
 import { MembersService } from './members.service';
+import { JwtAccessGuard } from '../../common/guards/jwt-access.guard';
+import { CompanyGuard } from '../../common/guards/company.guard';
+import { AddMemberDto, UpdateMemberRoleDto } from './dto';
+import {
+  requireOwner,
+  requireAdminOrOwner,
+} from '../../common/utils/roles.util';
+import { Request } from 'express';
 
-@ApiTags('Members')
-@ApiBearerAuth('bearer')
-@UseGuards(JwtAuthGuard, CompanyGuard)
+interface RequestWithUser extends Request {
+  user: { sub: string; email: string };
+  companyId?: string;
+  membership?: { role: string; [key: string]: any };
+}
+
+@ApiTags('members')
 @Controller('companies/:companyId/members')
+@UseGuards(JwtAccessGuard, CompanyGuard)
+@ApiBearerAuth('access')
+@ApiBearerAuth('company-id')
 export class MembersController {
-  constructor(private readonly svc: MembersService) {}
+  constructor(private service: MembersService) {}
 
   @Get()
-  async list(@Param('companyId') companyId: string) {
-    return this.svc.list(companyId);
+  @ApiOperation({ summary: 'Listar membros da empresa' })
+  @ApiParam({ name: 'companyId', description: 'ID da empresa' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de membros retornada com sucesso',
+  })
+  list(@Param('companyId') companyId: string) {
+    return this.service.list(companyId);
   }
 
-  @UseGuards(RolesGuard)
-  @Roles('owner','admin')
   @Post()
-  async invite(@Param('companyId') companyId: string, @Body() dto: InviteMemberDto) {
-    return this.svc.invite(companyId, dto.email, dto.role);
+  @ApiOperation({ summary: 'Adicionar membro à empresa' })
+  @ApiParam({ name: 'companyId', description: 'ID da empresa' })
+  @ApiResponse({
+    status: 201,
+    description: 'Membro adicionado com sucesso',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Dados inválidos ou usuário já é membro',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Apenas admin/owner pode adicionar membros',
+  })
+  add(
+    @Param('companyId') companyId: string,
+    @Req() req: RequestWithUser,
+    @Body() dto: AddMemberDto,
+  ) {
+    requireAdminOrOwner(req);
+    return this.service.add(companyId, dto);
   }
 
-  @UseGuards(RolesGuard)
-  @Roles('owner','admin')
-  @Patch(':memberId')
-  async updateRole(@Param('memberId') memberId: string, @Body() dto: InviteMemberDto) {
-    return this.svc.updateRole(memberId, dto.role);
+  @Patch(':memberId/role')
+  @ApiOperation({ summary: 'Atualizar papel do membro' })
+  @ApiParam({ name: 'companyId', description: 'ID da empresa' })
+  @ApiParam({ name: 'memberId', description: 'ID do membro' })
+  @ApiResponse({ status: 200, description: 'Papel atualizado com sucesso' })
+  @ApiResponse({ status: 403, description: 'Apenas owner pode alterar papéis' })
+  @ApiResponse({ status: 404, description: 'Membro não encontrado' })
+  updateRole(
+    @Req() req: RequestWithUser,
+    @Param('memberId') memberId: string,
+    @Body() body: UpdateMemberRoleDto,
+  ) {
+    requireOwner(req); // apenas owner altera papéis
+    return this.service.updateRole(req.companyId!, memberId, body);
   }
 
-  @UseGuards(RolesGuard)
-  @Roles('owner','admin')
   @Delete(':memberId')
-  async remove(@Param('memberId') memberId: string) {
-    return this.svc.remove(memberId);
+  @ApiOperation({ summary: 'Remover membro da empresa' })
+  @ApiParam({ name: 'companyId', description: 'ID da empresa' })
+  @ApiParam({ name: 'memberId', description: 'ID do membro' })
+  @ApiResponse({ status: 200, description: 'Membro removido com sucesso' })
+  @ApiResponse({
+    status: 403,
+    description: 'Apenas admin/owner pode remover membros',
+  })
+  @ApiResponse({ status: 404, description: 'Membro não encontrado' })
+  remove(
+    @Param('companyId') companyId: string,
+    @Req() req: RequestWithUser,
+    @Param('memberId') memberId: string,
+  ) {
+    requireAdminOrOwner(req);
+    return this.service.remove(companyId, memberId);
   }
 }

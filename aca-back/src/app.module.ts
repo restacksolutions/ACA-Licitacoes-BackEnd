@@ -1,48 +1,27 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
-import { ConfigModule } from './core/config/config.module';
-import { LoggerModule } from './core/logger/logger.module';
-import { PrismaModule } from './core/prisma/prisma.module';
-import { JwtStrategy } from './core/security/jwt.strategy';
-import { JwtAuthGuard } from './core/security/jwt-auth.guard';
-import { SupabaseAuthService } from './core/auth/supabase-auth.service';
-
-import { SupabaseStorage } from './adapters/storage/supabase.storage';
-
-import { HealthModule } from './health/health.module';
+import { ConfigModule } from '@nestjs/config';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+import { HealthController } from './health/health.controller';
 import { AuthModule } from './modules/auth/auth.module';
-import { UsersModule } from './modules/users/users.module';
 import { CompaniesModule } from './modules/companies/companies.module';
 import { MembersModule } from './modules/members/members.module';
-import { DocumentsModule } from './modules/documents/documents.module';
-import { BidsModule } from './modules/bids/bids.module';
-import { BidDocsModule } from './modules/bid-docs/bid-docs.module';
-import { WorkflowModule } from './modules/workflow/workflow.module';
-import { CommentsModule } from './modules/comments/comments.module';
-import { AuditModule } from './modules/audit/audit.module';
+import { CompanyDocsModule } from './modules/company-docs/company-docs.module';
+import { VehiclesModule } from './modules/vehicles/vehicles.module';
+import { LicitacoesModule } from './modules/licitacoes/licitacoes.module';
 
 @Module({
   imports: [
-    ConfigModule,
-    LoggerModule,
-    PrismaModule,
-    HealthModule,
+    // Carrega variáveis de ambiente e as torna globais
     AuthModule,
-    UsersModule,
     CompaniesModule,
     MembersModule,
-    DocumentsModule,
-    BidsModule,
-    BidDocsModule,
-    WorkflowModule,
-    CommentsModule,
-    AuditModule,
+    CompanyDocsModule,
+    LicitacoesModule,
+    ConfigModule.forRoot({ isGlobal: true }),
+    VehiclesModule,
   ],
-  providers: [
-    JwtStrategy,
-    SupabaseAuthService,
-    SupabaseStorage,
-    { provide: APP_GUARD, useClass: JwtAuthGuard }, // protege tudo por padrão
-  ],
+  controllers: [AppController, HealthController],
+  providers: [AppService],
 })
 export class AppModule {}

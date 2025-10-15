@@ -1,32 +1,91 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../core/security/jwt-auth.guard';
-import { CurrentUser } from '../../core/security/current-user.decorator';
-import { Public } from '../../core/security/public.decorator';
+// src/modules/auth/auth.controller.ts
+import {
+  Body,
+  Controller,
+  HttpCode,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { LoginDto, LoginResponseDto } from './dto/login.dto';
+import { RegisterDto, LoginDto } from './dto';
+import { JwtAccessGuard } from '../../common/guards/jwt-access.guard';
+import { JwtRefreshGuard } from '../../common/guards/jwt-refresh.guard';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiOkResponse,
+  ApiCreatedResponse,
+  ApiBody,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 
-@ApiTags('Auth')
+// Tipos de resposta só pro Swagger
+class TokenPairResponseDto {
+  accessToken!: string;
+  refreshToken!: string;
+}
+class MeResponseDto {
+  userId!: string;
+  email!: string;
+}
+
+// Tipagem do Request (Express)
+import type { Request } from 'express';
+interface RequestWithUser extends Request {
+  user: { sub: string; email: string };
+}
+interface RequestWithRefresh extends Request {
+  refresh: { sub: string; email: string };
+}
+
+@ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly svc: AuthService) {}
+  constructor(private service: AuthService) {}
 
-  @Post('login')
-  @Public()
-  @ApiOperation({ summary: 'Login com email e senha' })
-  @ApiResponse({ status: 200, description: 'Login realizado com sucesso', type: LoginResponseDto })
-  @ApiResponse({ status: 401, description: 'Credenciais inválidas' })
-  async login(@Body() loginDto: LoginDto): Promise<LoginResponseDto> {
-    return this.svc.login(loginDto);
+  @ApiOperation({ summary: 'Registrar usuário + empresa + membership (owner)' })
+  @ApiCreatedResponse({
+    description: 'Par de tokens',
+    type: TokenPairResponseDto,
+  })
+  @ApiBody({ type: RegisterDto })
+  @Post('register')
+  async register(@Body() dto: RegisterDto) {
+    return this.service.register(dto);
   }
 
-  @Get('me')
-  @ApiBearerAuth('bearer')
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Obter perfil do usuário autenticado' })
-  @ApiResponse({ status: 200, description: 'Perfil do usuário' })
-  @ApiResponse({ status: 401, description: 'Token inválido' })
-  async me(@CurrentUser() user: { authUserId: string }) {
-    return this.svc.me(user.authUserId);
+  @ApiOperation({ summary: 'Login com e-mail e senha' })
+  @ApiOkResponse({ description: 'Par de tokens', type: TokenPairResponseDto })
+  @ApiBody({ type: LoginDto })
+  @HttpCode(200)
+  @Post('login')
+  async login(@Body() dto: LoginDto) {
+    return this.service.login(dto);
+  }
+
+  // Usa o refresh token no header Authorization: Bearer <refreshToken>
+  @ApiOperation({ summary: 'Obter novo par de tokens usando refresh token' })
+  @ApiOkResponse({
+    description: 'Novo par de tokens',
+    type: TokenPairResponseDto,
+  })
+  @ApiBearerAuth('refresh') // usa o esquema "refresh" definido no Swagger
+  @UseGuards(JwtRefreshGuard)
+  @Post('refresh')
+  async refresh(@Req() req: RequestWithRefresh) {
+    return this.service.refresh(req.refresh.sub, req.refresh.email);
+  }
+
+  // Endpoint protegido para testar o access token
+  @ApiOperation({
+    summary: 'Retorna dados do usuário autenticado (teste do access token)',
+  })
+  @ApiOkResponse({ type: MeResponseDto })
+  @ApiBearerAuth('access') // usa o esquema "access" definido no Swagger
+  @UseGuards(JwtAccessGuard)
+  @Post('me')
+  me(@Req() req: RequestWithUser) {
+    return { userId: req.user.sub, email: req.user.email };
   }
 }

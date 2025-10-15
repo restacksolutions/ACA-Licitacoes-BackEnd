@@ -1,8 +1,12 @@
 import { Module } from '@nestjs/common';
-import { MembersService } from './members.service';
 import { MembersController } from './members.controller';
-import { JwtStrategy } from '../../core/security/jwt.strategy';
-import { SupabaseAuthService } from '../../core/auth/supabase-auth.service';
+import { MembersService } from './members.service';
+import { PrismaService } from '../../common/utils/prisma.service';
+import { AuthModule } from '../auth/auth.module';
 
-@Module({ providers: [MembersService, JwtStrategy, SupabaseAuthService], controllers: [MembersController] })
+@Module({
+  imports: [AuthModule],
+  controllers: [MembersController],
+  providers: [MembersService, PrismaService],
+})
 export class MembersModule {}
