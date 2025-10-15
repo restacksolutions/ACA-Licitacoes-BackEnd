@@ -12,7 +12,7 @@ COPY aca-back/ .
 # Prisma Client + build do Nest
 RUN npm run prisma:generate || npx prisma generate
 RUN npm run build
-
+ 
 # ===== 2) Runtime =====
 FROM node:20-alpine
 WORKDIR /app
