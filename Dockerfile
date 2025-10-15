@@ -1,9 +1,11 @@
 FROM node:20-alpine AS build
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+# Instalar dependências sem executar postinstall (que roda prisma generate)
+RUN npm ci --ignore-scripts
 COPY . .
-RUN npm run prisma:generate || npx prisma generate --schema=prisma/schema.prisma
+# Agora executar prisma generate manualmente
+RUN npx prisma generate --schema=prisma/schema.prisma
 RUN npm run build
 
 FROM node:20-alpine
@@ -12,7 +14,7 @@ ENV NODE_ENV=production PORT=3000
 
 # Instalar dependências de produção
 COPY --from=build /app/package*.json ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev --ignore-scripts
 
 # Copiar arquivos necessários
 COPY --from=build /app/dist ./dist
