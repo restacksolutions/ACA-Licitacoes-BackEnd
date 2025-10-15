@@ -1,18 +1,8 @@
 node_modules
-npm-debug.log
 .git
-.gitignore
+.env
+npm-debug.log
 .vscode
 coverage
-.env
-.env.*
 **/*.log
 **/*.swp
-**/*.local
-**/*.bak
-**/*.orig
-**/*.rej
-
-# NÃO ignore a pasta do backend:
-!aca-back
-!aca-back/prisma
