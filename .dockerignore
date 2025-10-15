@@ -1,20 +1,18 @@
 node_modules
 npm-debug.log
-Dockerfile
-.dockerignore
 .git
 .gitignore
 .vscode
 coverage
-.tmp
 .env
 .env.*
-**/*.swp
 **/*.log
+**/*.swp
 **/*.local
-**/*.md
 **/*.bak
 **/*.orig
 **/*.rej
-# Mantém prisma (necessário para migrations e generate)
-!prisma
+
+# NÃO ignore a pasta do backend:
+!aca-back
+!aca-back/prisma
