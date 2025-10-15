@@ -1,0 +1,20 @@
+node_modules
+npm-debug.log
+Dockerfile
+.dockerignore
+.git
+.gitignore
+.vscode
+coverage
+.tmp
+.env
+.env.*
+**/*.swp
+**/*.log
+**/*.local
+**/*.md
+**/*.bak
+**/*.orig
+**/*.rej
+# Mantém prisma (necessário para migrations e generate)
+!prisma
