@@ -7,12 +7,23 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   // Configuração do CORS
+  const allowedOrigins = [
+    'http://localhost:4200',  // Angular dev server
+    'http://127.0.0.1:4200', // Angular dev server (alternativo)
+    'http://localhost:3000',  // Swagger UI
+  ];
+
+  // Adicionar domínios de produção se existirem
+  if (process.env.FRONTEND_URL) {
+    allowedOrigins.push(process.env.FRONTEND_URL);
+  }
+  if (process.env.NODE_ENV === 'production') {
+    // Permitir todos os domínios em produção (ajuste conforme necessário)
+    allowedOrigins.push('*');
+  }
+
   app.enableCors({
-    origin: [
-      'http://localhost:4200',  // Angular dev server
-      'http://127.0.0.1:4200', // Angular dev server (alternativo)
-      'http://localhost:3000',  // Swagger UI
-    ],
+    origin: process.env.NODE_ENV === 'production' ? true : allowedOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
@@ -52,6 +63,7 @@ async function bootstrap() {
     swaggerOptions: { persistAuthorization: true },
   });
 
-  await app.listen(3000);
+  const port = process.env.PORT || 3000;
+  await app.listen(port);
 }
 bootstrap();

@@ -13,4 +13,7 @@ COPY --from=build /app/package*.json ./
 RUN npm ci --omit=dev
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
-CMD sh -c "npm run prisma:migrate || npx prisma migrate deploy --schema=prisma/schema.prisma && node dist/main.js"
+COPY start.sh ./
+# Executar migrações e iniciar aplicação
+RUN chmod +x /app/start.sh
+CMD ["/app/start.sh"]
