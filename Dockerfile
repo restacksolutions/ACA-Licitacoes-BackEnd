@@ -4,6 +4,7 @@ WORKDIR /app
 
 # copie apenas os manifests do backend
 COPY aca-back/package*.json ./ 
+RUN cd aca-back
 RUN npm ci
 
 # copie o código do backend
