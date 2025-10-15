@@ -7,6 +7,7 @@ import {
   UpdateLicDocDto,
   CreateLicEventDto,
 } from './dto';
+import { LicitacaoStatus } from '@prisma/client';
 
 @Injectable()
 export class LicitacoesService {
@@ -21,15 +22,19 @@ export class LicitacoesService {
     return this.prisma.licitacao.findMany({
       where: {
         companyId,
-        ...(status && {
-          status: status as
-            | 'draft'
-            | 'open'
-            | 'closed'
-            | 'cancelled'
-            | 'awarded',
-        }),
-        title: search ? { contains: search, mode: 'insensitive' } : undefined,
+        ...(status
+          ? {
+              status: status as LicitacaoStatus,
+            }
+          : {}),
+        ...(search
+          ? {
+              title: {
+                contains: search,
+                mode: 'insensitive',
+              },
+            }
+          : {}),
       },
       orderBy: { createdAt: 'desc' },
     });

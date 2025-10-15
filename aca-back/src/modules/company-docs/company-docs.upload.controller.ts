@@ -52,12 +52,7 @@ const ALLOWED = (
 @Controller('company-docs')
 @UseGuards(JwtAccessGuard, CompanyGuard)
 @ApiBearerAuth('access')
-@ApiHeader({
-  name: 'X-Company-Id',
-  description: 'ID da empresa (obrigatório para upload)',
-  required: true,
-  example: 'da6cc36e-b112-4301-ae6d-f824ccf944ad',
-})
+@ApiBearerAuth('company-id')
 export class CompanyDocsUploadController {
   constructor(private prisma: PrismaService) {}
 

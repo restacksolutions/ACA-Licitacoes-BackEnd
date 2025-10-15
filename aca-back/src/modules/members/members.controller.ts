@@ -36,6 +36,7 @@ interface RequestWithUser extends Request {
 @Controller('companies/:companyId/members')
 @UseGuards(JwtAccessGuard, CompanyGuard)
 @ApiBearerAuth('access')
+@ApiBearerAuth('company-id')
 export class MembersController {
   constructor(private service: MembersService) {}
 

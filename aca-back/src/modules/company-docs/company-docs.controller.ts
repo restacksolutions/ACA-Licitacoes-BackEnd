@@ -37,12 +37,7 @@ interface AuthenticatedRequest extends Request {
 @Controller('company-docs')
 @UseGuards(JwtAccessGuard, CompanyGuard)
 @ApiBearerAuth('access')
-@ApiHeader({
-  name: 'X-Company-Id',
-  description: 'ID da empresa (opcional se company_id estiver no body)',
-  required: false,
-  example: 'da6cc36e-b112-4301-ae6d-f824ccf944ad',
-})
+@ApiBearerAuth('company-id')
 export class CompanyDocsController {
   constructor(private service: CompanyDocsService) {}
 

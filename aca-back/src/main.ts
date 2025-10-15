@@ -37,6 +37,10 @@ async function bootstrap() {
       { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
       'refresh',
     )
+    .addApiKey(
+      { type: 'apiKey', name: 'X-Company-Id', in: 'header' },
+      'company-id',
+    )
     .build();
 
   // NÃO filtrar módulos aqui (veja item 3)

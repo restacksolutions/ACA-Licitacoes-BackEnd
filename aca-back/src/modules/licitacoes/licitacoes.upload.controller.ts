@@ -10,17 +10,25 @@ import {
   UseInterceptors,
   UploadedFile,
 } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiParam,
+  ApiConsumes,
+  ApiBody,
+} from '@nestjs/swagger';
 import { JwtAccessGuard } from '../../common/guards/jwt-access.guard';
 import { CompanyGuard } from '../../common/guards/company.guard';
 import { PrismaService } from '../../common/utils/prisma.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { sha256 } from '../../common/utils/hash.utils';
-import type { Request, Response } from 'express';
+import type { Response } from 'express';
+import { Request } from 'express';
 
 interface AuthenticatedRequest extends Request {
   companyId: string;
-  user: { sub: string; email: string };
-  membership?: { role: string; [key: string]: any };
 }
 
 const MAX_BYTES = Number(process.env.UPLOAD_MAX_BYTES || 10 * 1024 * 1024);
@@ -31,6 +39,9 @@ const ALLOWED = (
   .split(',')
   .map((s) => s.trim());
 
+@ApiTags('Licitações - Upload')
+@ApiBearerAuth('access')
+@ApiBearerAuth('company-id')
 @Controller('licitacoes')
 @UseGuards(JwtAccessGuard, CompanyGuard)
 export class LicitacoesUploadController {
@@ -38,6 +49,55 @@ export class LicitacoesUploadController {
 
   // Upload de arquivo para um documento da licitação (multipart)
   @Post(':id/documents/:docId/upload')
+  @ApiOperation({ summary: 'Upload de arquivo para documento da licitação' })
+  @ApiParam({ name: 'id', description: 'ID da licitação' })
+  @ApiParam({ name: 'docId', description: 'ID do documento' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    description: 'Arquivo para upload',
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'Arquivo para upload (PDF, DOC, DOCX)',
+        },
+      },
+      required: ['file'],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Arquivo enviado com sucesso',
+    schema: {
+      type: 'object',
+      properties: {
+        id: {
+          type: 'string',
+          example: 'doc-123e4567-e89b-12d3-a456-426614174000',
+        },
+        name: { type: 'string', example: 'Proposta Técnica' },
+        fileName: { type: 'string', example: 'proposta_tecnica.pdf' },
+        fileMime: { type: 'string', example: 'application/pdf' },
+        fileSize: { type: 'number', example: 245760 },
+        fileSha256: { type: 'string', example: 'a1b2c3d4e5f6789...' },
+        submitted: { type: 'boolean', example: true },
+        licitacaoId: {
+          type: 'string',
+          example: '123e4567-e89b-12d3-a456-426614174000',
+        },
+        updatedAt: { type: 'string', example: '2024-01-15T10:30:00.000Z' },
+      },
+    },
+  })
+  @ApiResponse({ status: 400, description: 'Arquivo inválido ou muito grande' })
+  @ApiResponse({
+    status: 404,
+    description: 'Licitação ou documento não encontrado',
+  })
+  @ApiResponse({ status: 401, description: 'Token inválido' })
+  @ApiResponse({ status: 403, description: 'Sem permissão para a empresa' })
   @UseInterceptors(FileInterceptor('file'))
   async upload(
     @Req() req: AuthenticatedRequest,
@@ -77,6 +137,13 @@ export class LicitacoesUploadController {
 
   // Download do arquivo do documento
   @Get(':id/documents/:docId/file')
+  @ApiOperation({ summary: 'Download de arquivo do documento da licitação' })
+  @ApiParam({ name: 'id', description: 'ID da licitação' })
+  @ApiParam({ name: 'docId', description: 'ID do documento' })
+  @ApiResponse({ status: 200, description: 'Arquivo baixado com sucesso' })
+  @ApiResponse({ status: 404, description: 'Arquivo não encontrado' })
+  @ApiResponse({ status: 401, description: 'Token inválido' })
+  @ApiResponse({ status: 403, description: 'Sem permissão para a empresa' })
   async download(
     @Req() req: AuthenticatedRequest,
     @Param('id') id: string,

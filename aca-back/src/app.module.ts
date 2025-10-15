@@ -8,6 +8,7 @@ import { CompaniesModule } from './modules/companies/companies.module';
 import { MembersModule } from './modules/members/members.module';
 import { CompanyDocsModule } from './modules/company-docs/company-docs.module';
 import { VehiclesModule } from './modules/vehicles/vehicles.module';
+import { LicitacoesModule } from './modules/licitacoes/licitacoes.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { VehiclesModule } from './modules/vehicles/vehicles.module';
     CompaniesModule,
     MembersModule,
     CompanyDocsModule,
+    LicitacoesModule,
     ConfigModule.forRoot({ isGlobal: true }),
     VehiclesModule,
   ],
